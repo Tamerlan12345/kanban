@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Канбан с ролями и ИИ-аналитикой (Локальная версия)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { font-family: 'Inter', sans-serif; overflow-x: hidden; }
+        .task:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05); }
+        .dragging { opacity: 0.5; transform: rotate(3deg); }
+        .drag-over { background-color: rgba(34, 197, 94, 0.1); border: 2px dashed #22c55e; }
+        .modal-backdrop, .modal-content { transition: all 0.3s ease; }
+        .priority-low { border-left: 5px solid #34d399; }
+        .priority-medium { border-left: 5px solid #fbbf24; }
+        .priority-high { border-left: 5px solid #f87171; }
+        [v-cloak] { display: none; }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <div id="app" v-cloak>
+        <!-- === ОСНОВНОЕ ПРИЛОЖЕНИЕ === -->
+        <div>
+            <header class="bg-white shadow-sm p-4 flex justify-between items-center">
+                <div class="flex items-center gap-3">
+                    <i class="fas fa-robot text-2xl text-blue-500"></i>
+                    <h1 class="text-xl font-bold text-gray-700">ИИ-агент Канбан</h1>
+                </div>
+                <div class="flex items-center gap-4">
+                    <label for="role-switcher" class="text-sm font-medium">Текущая роль:</label>
+                    <select id="role-switcher" v-model="user.role" class="border-gray-300 rounded-lg shadow-sm">
+                        <option value="projectAdmin">Администратор проекта</option>
+                        <option value="boardAdmin">Администратор доски</option>
+                        <option value="user">Пользователь</option>
+                    </select>
+                </div>
+            </header>
+
+            <!-- === ПАНЕЛЬ АДМИНИСТРАТОРА ПРОЕКТА === -->
+            <div id="admin-panel-view" v-if="user.role === 'projectAdmin'" class="p-8">
+                <h2 class="text-3xl font-bold mb-6">Панель Администратора Проекта</h2>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <!-- Управление пользователями -->
+                    <div class="bg-white p-6 rounded-xl shadow-lg">
+                        <h3 class="text-xl font-bold mb-4">Управление пользователями</h3>
+                        <form @submit.prevent="createUser" class="flex gap-2 mb-4">
+                            <input type="email" v-model="newUser.email" placeholder="Email нового пользователя" class="flex-grow border-gray-300 rounded-lg">
+                            <button type="submit" class="bg-blue-500 text-white px-4 rounded-lg hover:bg-blue-600">+</button>
+                        </form>
+                        <ul>
+                            <li v-for="u in allUsers" :key="u.id" class="flex justify-between items-center p-2 border-b">
+                                <span>{{ u.email }}</span>
+                                <select v-model="u.role" class="border-gray-300 rounded-lg">
+                                    <option value="user">Пользователь</option>
+                                    <option value="boardAdmin">Админ доски</option>
+                                    <option value="projectAdmin">Админ проекта</option>
+                                </select>
+                            </li>
+                        </ul>
+                    </div>
+                    <!-- Управление досками -->
+                    <div class="bg-white p-6 rounded-xl shadow-lg">
+                        <h3 class="text-xl font-bold mb-4">Управление досками</h3>
+                        <form @submit.prevent="createProject" class="flex gap-2 mb-4">
+                             <input type="text" v-model="newProject.title" placeholder="Название новой доски" class="flex-grow border-gray-300 rounded-lg">
+                             <button type="submit" class="bg-blue-500 text-white px-4 rounded-lg hover:bg-blue-600">+</button>
+                        </form>
+                        <div v-for="p in allProjects" :key="p.id" class="mb-4 p-3 border rounded-lg">
+                            <h4 class="font-bold">{{ p.title }}</h4>
+                            <select multiple v-model="p.members" class="w-full mt-2 border-gray-300 rounded-lg h-24">
+                                <option v-for="u in allUsers" :value="u.id">{{ u.email }}</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                 <!-- ИИ Аналитика -->
+                <div class="bg-white p-6 rounded-xl shadow-lg mt-8">
+                    <h3 class="text-xl font-bold mb-4 flex items-center gap-2"><i class="fas fa-lightbulb text-yellow-400"></i>ИИ-Аналитика</h3>
+                    <div class="flex flex-wrap gap-4 mb-4">
+                        <button @click="getAiAnalysis('productivity')" class="bg-indigo-500 text-white px-4 py-2 rounded-lg hover:bg-indigo-600">Анализ продуктивности</button>
+                        <button @click="getAiAnalysis('risks')" class="bg-indigo-500 text-white px-4 py-2 rounded-lg hover:bg-indigo-600">Анализ рисков и задержек</button>
+                        <button @click="getAiAnalysis('summary')" class="bg-indigo-500 text-white px-4 py-2 rounded-lg hover:bg-indigo-600">Общая сводка по проектам</button>
+                    </div>
+                    <div v-if="ai.loading" class="flex items-center gap-2 text-indigo-600">
+                        <i class="fas fa-spinner fa-spin"></i> ИИ генерирует отчет...
+                    </div>
+                    <div v-if="ai.report" class="prose max-w-none mt-4 p-4 bg-indigo-50 rounded-lg border border-indigo-200" v-html="ai.report"></div>
+                </div>
+            </div>
+
+            <!-- === ДАШБОРД ПОЛЬЗОВАТЕЛЯ (СПИСОК ДОСОК) === -->
+            <div id="dashboard-view" v-if="user.role !== 'projectAdmin' && !currentProject" class="p-8">
+                 <h2 class="text-3xl font-bold mb-6">Ваши доски</h2>
+                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                     <div v-for="p in userProjects" :key="p.id" @click="selectProject(p.id)" class="bg-white p-6 rounded-xl shadow-lg cursor-pointer hover:shadow-xl hover:-translate-y-1 transition-all">
+                         <h3 class="text-xl font-bold text-gray-800">{{ p.title }}</h3>
+                     </div>
+                 </div>
+            </div>
+            
+            <!-- === ВИД КАНБАН-ДОСКИ === -->
+            <div id="kanban-view" v-if="currentProject" class="p-4 md:p-8">
+                <div class="flex items-center gap-4 mb-6">
+                    <button @click="goBackToDashboard" class="text-blue-500 hover:underline">&larr; Назад к доскам</button>
+                    <h2 class="text-3xl font-bold">{{ currentProject.title }}</h2>
+                </div>
+                <main class="flex items-start gap-6 overflow-x-auto pb-8">
+                    <!-- Колонки -->
+                    <div v-for="column in currentProject.columns" :key="column.id" class="w-80 bg-gray-200 rounded-xl shadow-md flex-shrink-0 flex flex-col">
+                        <div class="flex items-center justify-between p-4 border-b border-gray-300">
+                            <h3 class="font-semibold text-gray-700">{{ column.title }}</h3>
+                            <button @click="openTaskModal(column.id)" class="text-gray-500 hover:text-blue-500"><i class="fas fa-plus"></i></button>
+                        </div>
+                        <div class="tasks-container p-3 flex-grow min-h-[100px]" 
+                             @dragover.prevent="dragOver" 
+                             @dragleave="dragLeave" 
+                             @drop="drop($event, column.id)">
+                            <!-- Задачи -->
+                            <div v-for="task in currentProject.tasks.filter(t => t.columnId === column.id)" 
+                                 :key="task.id"
+                                 :class="`task bg-white p-4 rounded-lg shadow-sm mb-3 cursor-pointer priority-${task.priority}`"
+                                 draggable="true"
+                                 @dragstart="dragStart($event, task.id)"
+                                 @click="openTaskModal(column.id, task.id)">
+                                <p class="font-medium mb-1">{{ task.title }}</p>
+                                <p class="text-sm text-gray-600">{{ task.description.substring(0, 50) }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Новая колонка -->
+                    <div v-if="user.role !== 'user'">
+                        <button @click="addColumn" class="bg-white/80 backdrop-blur-sm text-gray-600 px-4 py-3 rounded-lg shadow-sm hover:bg-white w-72">
+                            <i class="fas fa-plus mr-2"></i>Добавить колонку
+                        </button>
+                    </div>
+                </main>
+            </div>
+        </div>
+
+        <!-- Модальное окно задачи -->
+        <div v-if="taskModal.isOpen" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-40">
+            <div class="bg-white rounded-xl shadow-2xl p-8 w-full max-w-2xl">
+                <h2 class="text-2xl font-bold mb-6">{{ taskModal.isEditing ? 'Редактировать задачу' : 'Новая задача' }}</h2>
+                <form @submit.prevent="saveTask">
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Название</label>
+                        <input type="text" v-model="taskModal.data.title" class="w-full border-gray-300 rounded-lg" required>
+                    </div>
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Описание</label>
+                        <textarea v-model="taskModal.data.description" rows="4" class="w-full border-gray-300 rounded-lg"></textarea>
+                    </div>
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Приоритет</label>
+                        <select v-model="taskModal.data.priority" class="w-full border-gray-300 rounded-lg">
+                            <option value="low">Низкий</option>
+                            <option value="medium">Средний</option>
+                            <option value="high">Высокий</option>
+                        </select>
+                    </div>
+                    <div class="flex justify-end gap-4">
+                        <button type="button" @click="taskModal.isOpen = false" class="bg-gray-200 text-gray-700 px-6 py-2 rounded-lg">Отмена</button>
+                        <button type="submit" class="bg-blue-500 text-white px-6 py-2 rounded-lg">Сохранить</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Модальное окно для уведомлений -->
+        <div v-if="alert.isOpen" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm text-center">
+                <p class="text-lg mb-6">{{ alert.message }}</p>
+                <button @click="alert.isOpen = false" class="bg-blue-500 text-white px-6 py-2 rounded-lg">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { createApp, ref, onMounted, reactive, watch, computed } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js';
+
+        // Уникальный ID для симуляции
+        const uid = () => `id_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+        createApp({
+            setup() {
+                // --- ЛОКАЛЬНОЕ СОСТОЯНИЕ ---
+                const user = reactive({ role: 'projectAdmin' });
+                const allUsers = ref([]);
+                const allProjects = ref([]);
+                const newUser = reactive({ email: '' });
+                const newProject = reactive({ title: '' });
+                const currentProject = ref(null);
+                let draggedTaskId = null;
+
+                // Modals & UI State
+                const taskModal = reactive({ isOpen: false, isEditing: false, data: {} });
+                const alert = reactive({ isOpen: false, message: '' });
+                const ai = reactive({ loading: false, report: '' });
+                
+                // --- ИНИЦИАЛИЗАЦИЯ ПРИЛОЖЕНИЯ ---
+                onMounted(() => {
+                    seedInitialData();
+                });
+
+                // Вычисляемое свойство для досок текущего пользователя
+                const userProjects = computed(() => {
+                    if (user.role === 'projectAdmin') return allProjects.value;
+                    const currentUser = allUsers.value.find(u => u.role === user.role);
+                    if (!currentUser) return [];
+                    return allProjects.value.filter(p => p.members.includes(currentUser.id));
+                });
+                
+                watch(() => user.role, () => {
+                    currentProject.value = null;
+                });
+
+                // --- ЛОГИКА АДМИН-ПАНЕЛИ ---
+                function createUser() {
+                    if (!newUser.email) {
+                        showAlert('Введите email.');
+                        return;
+                    }
+                    allUsers.value.push({ id: uid(), email: newUser.email, role: 'user' });
+                    showAlert(`Пользователь ${newUser.email} добавлен.`);
+                    newUser.email = '';
+                }
+
+                function createProject() {
+                    if (!newProject.title) return;
+                    const adminUser = allUsers.value.find(u => u.role === 'projectAdmin');
+                    allProjects.value.push({
+                        id: uid(),
+                        title: newProject.title,
+                        ownerId: adminUser ? adminUser.id : 'unknown',
+                        members: adminUser ? [adminUser.id] : [],
+                        columns: [
+                            { id: uid(), title: 'Сделать', order: 1 },
+                            { id: uid(), title: 'В процессе', order: 2 },
+                            { id: uid(), title: 'Готово', order: 3 },
+                        ],
+                        tasks: []
+                    });
+                    newProject.title = '';
+                }
+                
+                // --- ЛОГИКА КАНБАН-ДОСКИ ---
+                function selectProject(projectId) {
+                    currentProject.value = allProjects.value.find(p => p.id === projectId);
+                }
+                
+                function goBackToDashboard() {
+                    currentProject.value = null;
+                }
+
+                function addColumn() {
+                    const title = prompt("Название новой колонки:");
+                    if (title && title.trim() && currentProject.value) {
+                        const newOrder = currentProject.value.columns.length > 0 ? Math.max(...currentProject.value.columns.map(c => c.order)) + 1 : 1;
+                        currentProject.value.columns.push({ id: uid(), title: title.trim(), order: newOrder });
+                    }
+                }
+
+                // --- УПРАВЛЕНИЕ ЗАДАЧАМИ ---
+                function openTaskModal(columnId, taskId = null) {
+                    if (taskId && currentProject.value) {
+                        const taskData = currentProject.value.tasks.find(t => t.id === taskId);
+                        taskModal.data = { ...taskData };
+                        taskModal.isEditing = true;
+                    } else {
+                        taskModal.data = { columnId, title: '', description: '', priority: 'medium' };
+                        taskModal.isEditing = false;
+                    }
+                    taskModal.isOpen = true;
+                }
+
+                function saveTask() {
+                    if (!currentProject.value) return;
+                    if (taskModal.isEditing) {
+                        const taskIndex = currentProject.value.tasks.findIndex(t => t.id === taskModal.data.id);
+                        if (taskIndex !== -1) {
+                            currentProject.value.tasks[taskIndex] = { ...taskModal.data };
+                        }
+                    } else {
+                        currentProject.value.tasks.push({ ...taskModal.data, id: uid() });
+                    }
+                    taskModal.isOpen = false;
+                }
+
+                // --- DRAG & DROP ---
+                function dragStart(event, taskId) { draggedTaskId = taskId; }
+                function dragOver(event) { event.currentTarget.classList.add('drag-over'); }
+                function dragLeave(event) { event.currentTarget.classList.remove('drag-over'); }
+                function drop(event, newColumnId) {
+                    event.currentTarget.classList.remove('drag-over');
+                    if (draggedTaskId && currentProject.value) {
+                        const task = currentProject.value.tasks.find(t => t.id === draggedTaskId);
+                        if (task) {
+                            task.columnId = newColumnId;
+                        }
+                        draggedTaskId = null;
+                    }
+                }
+                
+                // --- ИИ-АНАЛИТИКА ---
+                async function getAiAnalysis(type) {
+                    ai.loading = true;
+                    ai.report = '';
+
+                    let dataString = "АНАЛИТИЧЕСКИЕ ДАННЫЕ:\n\nПОЛЬЗОВАТЕЛИ:\n";
+                    allUsers.value.forEach(u => { dataString += `- ${u.email} (Роль: ${u.role})\n`; });
+
+                    dataString += "\nПРОЕКТЫ И ЗАДАЧИ:\n";
+                    allProjects.value.forEach(p => {
+                        dataString += `\n---\nПроект: ${p.title}\n`;
+                        if (p.tasks.length === 0) {
+                            dataString += "  - Задач нет\n";
+                        } else {
+                            p.tasks.forEach(t => {
+                                const columnName = p.columns.find(c => c.id === t.columnId)?.title || 'N/A';
+                                dataString += `  - Задача: ${t.title} (Приоритет: ${t.priority}, Колонка: ${columnName})\n`;
+                            });
+                        }
+                    });
+                    
+                    let prompt = "";
+                    if (type === 'productivity') {
+                        prompt = `Ты — ведущий AI-аналитик в IT-компании. Проанализируй предоставленные данные о проектах, задачах и пользователях. Подготовь отчет о продуктивности. Для каждого пользователя оцени количество выполненных задач (в колонке "Готово" или аналогичной), среднее время на задачу (если есть данные), и общую вовлеченность. Выдели самых продуктивных сотрудников и тех, кому может потребоваться помощь. Ответ дай на русском языке в формате Markdown.`;
+                    } else if (type === 'risks') {
+                        prompt = `Ты — AI-эксперт по управлению рисками. Проанализируй данные о канбан-досках. Выяви проекты и задачи, которые находятся "в процессе" дольше всего. Определи "узкие места" (колонки с наибольшим скоплением задач). Укажи потенциальные риски срыва сроков. Предложи рекомендации по перераспределению ресурсов. Ответ дай на русском языке в формате Markdown.`;
+                    } else {
+                        prompt = `Ты — AI-ассистент руководителя проекта. Подготовь общую сводку по всем проектам. Укажи: 1) Общее количество проектов и задач. 2) Процент выполненных задач. 3) Проекты, требующие особого внимания. 4) Общие выводы и ключевые показатели. Ответ дай на русском языке в формате Markdown.`;
+                    }
+                    
+                    const result = await callGemini(`${prompt}\n\nВот данные для анализа:\n${dataString}`);
+                    if (result) {
+                        ai.report = result.replace(/\n/g, '<br>').replace(/\* \s*/g, '<br>&bull; ');
+                    } else {
+                        ai.report = "<p class='text-red-500'>Не удалось получить отчет от ИИ.</p>";
+                    }
+                    ai.loading = false;
+                }
+                
+                async function callGemini(prompt) {
+                    const apiKey = "AIzaSyA-yzXf_QcZmiGonbrGj3cch1wPGkcgGeg"; 
+                    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+                    const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
+                    try {
+                        const response = await fetch(apiUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+                        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                        const result = await response.json();
+                        return result.candidates[0].content.parts[0].text;
+                    } catch (error) {
+                        console.error("Ошибка вызова Gemini API:", error);
+                        return null;
+                    }
+                }
+                
+                function seedInitialData() {
+                    if (allUsers.value.length === 0) {
+                        const admin = { id: uid(), email: 'admin@example.com', role: 'projectAdmin' };
+                        const manager = { id: uid(), email: 'manager@example.com', role: 'boardAdmin' };
+                        const worker = { id: uid(), email: 'user@example.com', role: 'user' };
+                        allUsers.value.push(admin, manager, worker);
+
+                        allProjects.value.push({
+                            id: uid(),
+                            title: 'Тестовый проект',
+                            ownerId: admin.id,
+                            members: [admin.id, manager.id, worker.id],
+                            columns: [
+                                { id: uid(), title: 'Сделать', order: 1 },
+                                { id: uid(), title: 'В процессе', order: 2 },
+                                { id: uid(), title: 'Готово', order: 3 },
+                            ],
+                            tasks: []
+                        });
+                    }
+                }
+
+                function showAlert(msg) {
+                    alert.message = msg;
+                    alert.isOpen = true;
+                }
+
+                return {
+                    user, allUsers, allProjects, newUser, newProject, createUser, createProject,
+                    userProjects, currentProject, selectProject, goBackToDashboard,
+                    taskModal, openTaskModal, saveTask, addColumn,
+                    dragStart, dragOver, dragLeave, drop,
+                    alert, ai, getAiAnalysis
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
