@@ -106,6 +106,16 @@
             <!-- === ДАШБОРД ПОЛЬЗОВАТЕЛЯ (СПИСОК ДОСОК) === -->
             <div id="dashboard-view" v-if="user.role !== 'projectAdmin' && !currentProject" class="p-8">
                  <h2 class="text-3xl font-bold mb-6">Ваши доски</h2>
+
+                 <!-- Форма создания новой доски для обычных пользователей -->
+                 <div class="bg-white p-6 rounded-xl shadow-lg mb-8">
+                    <h3 class="text-xl font-bold mb-4">Создать новую доску</h3>
+                    <form @submit.prevent="createProject" class="flex gap-2">
+                        <input type="text" v-model="newProject.title" placeholder="Название новой доски" class="flex-grow border-gray-300 rounded-lg shadow-sm">
+                        <button type="submit" class="bg-blue-500 text-white px-5 py-2 rounded-lg font-semibold hover:bg-blue-600 transition">+</button>
+                    </form>
+                </div>
+
                  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                      <div v-for="p in userProjects" :key="p.id" @click="selectProject(p.id)" class="bg-white p-6 rounded-xl shadow-lg cursor-pointer hover:shadow-xl hover:-translate-y-1 transition-all">
                          <h3 class="text-xl font-bold text-gray-800">{{ p.title }}</h3>

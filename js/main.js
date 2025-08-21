@@ -186,7 +186,7 @@ createApp({
                 if (projectError) throw projectError;
                 currentProject.value = projectData;
 
-                // 2. Получаем участников проекта
+                // 2. Получаем участников проекта с улучшенной обработкой ошибок
                 const { data: membersData, error: membersError } = await supabaseClient
                     .from('project_members')
                     .select(`
@@ -195,10 +195,14 @@ createApp({
                     `)
                     .eq('project_id', projectId);
 
-                if (membersError) throw membersError;
-
-                // Приводим данные к нужному формату (список профилей)
-                currentProjectMembers.value = membersData.map(m => m.profiles);
+                if (membersError) {
+                    console.error("Error fetching project members:", membersError);
+                    showAlert("Не удалось загрузить список участников проекта. Функции ИИ могут быть недоступны.");
+                    // Не прерываем выполнение, просто оставляем список участников пустым
+                    currentProjectMembers.value = [];
+                } else {
+                    currentProjectMembers.value = membersData.map(m => m.profiles);
+                }
 
             } catch (error) {
                 console.error("Error selecting project:", error);
@@ -317,6 +321,11 @@ createApp({
             ai.taskHelperSuggestion = '';
 
             try {
+                if (currentProjectMembers.value.length === 0) {
+                    showAlert("Не удалось получить список участников проекта. Функция ИИ недоступна.");
+                    return;
+                }
+
                 const { data: { session } } = await supabaseClient.auth.getSession();
                 if (!session) throw new Error("Пользователь не авторизован.");
 
@@ -349,6 +358,11 @@ createApp({
             ai.projectReport = '';
 
             try {
+                if (currentProjectMembers.value.length === 0) {
+                    showAlert("Список участников проекта пуст или не удалось его загрузить. Анализ невозможен.");
+                    return;
+                }
+
                 const { data: { session } } = await supabaseClient.auth.getSession();
                 if (!session) throw new Error("Пользователь не авторизован.");
 
