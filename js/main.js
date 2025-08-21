@@ -10,6 +10,7 @@ createApp({
         const allUsers = ref([]);
         const allProjects = ref([]);
         const currentProject = ref(null);
+        const currentProjectMembers = ref([]);
 
         const loginForm = reactive({ email: '', password: '', error: '', loading: false });
         const newUser = reactive({ email: '', password: '' });
@@ -23,6 +24,8 @@ createApp({
         const ai = reactive({
             loading: false,
             report: '',
+            projectReportLoading: false,
+            projectReport: '',
             taskHelperLoading: false,
             taskHelperSuggestion: ''
         });
@@ -178,18 +181,37 @@ createApp({
         // --- ЛОГИКА КАНБАН-ДОСКИ ---
         async function selectProject(projectId) {
             try {
-                const { data, error } = await supabaseClient.rpc('get_project_details', { p_id: projectId });
-                if (error) throw error;
-                currentProject.value = data;
+                // 1. Получаем основные данные проекта (колонки, задачи)
+                const { data: projectData, error: projectError } = await supabaseClient.rpc('get_project_details', { p_id: projectId });
+                if (projectError) throw projectError;
+                currentProject.value = projectData;
+
+                // 2. Получаем участников проекта
+                const { data: membersData, error: membersError } = await supabaseClient
+                    .from('project_members')
+                    .select(`
+                        user_id,
+                        profiles ( id, email, role )
+                    `)
+                    .eq('project_id', projectId);
+
+                if (membersError) throw membersError;
+
+                // Приводим данные к нужному формату (список профилей)
+                currentProjectMembers.value = membersData.map(m => m.profiles);
+
             } catch (error) {
                 console.error("Error selecting project:", error);
                 showAlert("Не удалось загрузить данные проекта.");
                 currentProject.value = null;
+                currentProjectMembers.value = [];
             }
         }
 
         function goBackToDashboard() {
             currentProject.value = null;
+            currentProjectMembers.value = [];
+            ai.projectReport = ''; // Сбрасываем отчет при выходе с доски
         }
 
         async function addColumn() {
@@ -302,8 +324,8 @@ createApp({
                 const payload = {
                     analysisType: helperType,
                     task: taskModal.data,
-                    // Передаем только email пользователей, чтобы не слать лишнего
-                    projectMembers: allUsers.value.map(u => u.email)
+                    // FIX: Используем участников текущего проекта, а не всех пользователей
+                    projectMembers: currentProjectMembers.value.map(u => u.email)
                 };
 
                 const { data, error } = await supabaseClient.functions.invoke('ai-handler', {
@@ -318,6 +340,39 @@ createApp({
                 ai.taskHelperSuggestion = `<p class='text-red-500'>Ошибка: ${error.message}</p>`;
             } finally {
                 ai.taskHelperLoading = false;
+            }
+        }
+
+        // --- НОВАЯ ФУНКЦИЯ АНАЛИТИКИ ПО ПРОЕКТУ ---
+        async function getProjectAiAnalysis(analysisType) {
+            ai.projectReportLoading = true;
+            ai.projectReport = '';
+
+            try {
+                const { data: { session } } = await supabaseClient.auth.getSession();
+                if (!session) throw new Error("Пользователь не авторизован.");
+
+                // Формируем payload, используя только данные текущего проекта
+                const payload = {
+                    analysisType,
+                    allProjects: [currentProject.value], // Передаем массив с одним проектом
+                    allUsers: currentProjectMembers.value // Передаем участников этого проекта
+                };
+
+                const { data, error } = await supabaseClient.functions.invoke('ai-handler', {
+                    body: payload,
+                });
+
+                if (error) throw error;
+
+                // Отображаем отчет в новом поле
+                ai.projectReport = data.report.replace(/\n/g, '<br>').replace(/\* \s*/g, '<br>&bull; ');
+
+            } catch (error) {
+                console.error("Error invoking Edge Function for project:", error);
+                ai.projectReport = `<p class='text-red-500'>Ошибка при вызове ИИ-аналитики: ${error.message}</p>`;
+            } finally {
+                ai.projectReportLoading = false;
             }
         }
 
@@ -381,6 +436,7 @@ createApp({
             isAuthenticated, user, allUsers, allProjects, loginForm, newUser, newProject,
             login, logout, createUser, createProject,
             userProjects, currentProject, selectProject, goBackToDashboard,
+            currentProjectMembers, getProjectAiAnalysis, // <-- Добавлено
             taskModal, openTaskModal, saveTask, addColumn,
             dragStart, dragOver, dragLeave, drop,
             alert, ai, getAiAnalysis, getAiTaskHelper, closeTaskModal,
