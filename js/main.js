@@ -120,6 +120,15 @@ createApp({
             try {
                 const { error } = await supabaseClient.auth.signOut();
                 if (error) throw error;
+                // Принудительно сбрасываем состояние, чтобы гарантировать выход из системы в UI.
+                // onAuthStateChange также сработает, но это — надежная подстраховка.
+                isAuthenticated.value = false;
+                user.id = null;
+                user.email = null;
+                user.role = 'user';
+                allProjects.value = [];
+                allUsers.value = [];
+                currentProject.value = null;
             } catch (error) {
                 console.error('Logout error:', error);
                 showAlert('Ошибка при выходе из системы.');
