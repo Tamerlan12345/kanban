@@ -119,6 +119,21 @@
                     <button @click="goBackToDashboard" class="text-blue-500 hover:underline">&larr; Назад к доскам</button>
                     <h2 class="text-3xl font-bold">{{ currentProject.title }}</h2>
                 </div>
+
+                <!-- === ИИ Аналитика по текущей доске === -->
+                <div class="bg-white p-6 rounded-xl shadow-lg mb-6">
+                    <h3 class="text-xl font-bold mb-4 flex items-center gap-2"><i class="fas fa-lightbulb text-yellow-400"></i>Аналитика по доске</h3>
+                    <div class="flex flex-wrap gap-4 mb-4">
+                        <button @click="getProjectAiAnalysis('productivity')" class="bg-indigo-500 text-white px-4 py-2 rounded-lg hover:bg-indigo-600 transition-all">Анализ продуктивности</button>
+                        <button @click="getProjectAiAnalysis('risks')" class="bg-indigo-500 text-white px-4 py-2 rounded-lg hover:bg-indigo-600 transition-all">Анализ рисков</button>
+                        <button @click="getProjectAiAnalysis('summary')" class="bg-indigo-500 text-white px-4 py-2 rounded-lg hover:bg-indigo-600 transition-all">Сводка по доске</button>
+                    </div>
+                    <div v-if="ai.projectReportLoading" class="flex items-center gap-2 text-indigo-600">
+                        <i class="fas fa-spinner fa-spin"></i> ИИ генерирует отчет по проекту...
+                    </div>
+                    <div v-if="ai.projectReport" class="prose max-w-none mt-4 p-4 bg-indigo-50 rounded-lg border border-indigo-200" v-html="ai.projectReport"></div>
+                </div>
+
                 <main class="flex items-start gap-6 overflow-x-auto pb-8">
                     <!-- Колонки -->
                     <div v-for="column in currentProject.columns" :key="column.id" class="w-80 bg-gray-200 rounded-xl shadow-md flex-shrink-0 flex flex-col">
