@@ -1,4 +1,4 @@
-import { createApp, ref, onMounted, reactive, computed } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js';
+import { createApp, ref, onMounted, reactive, computed } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.prod.js';
 import supabaseClient from './supabaseClient.js';
 
 // --- ОСНОВНОЕ ПРИЛОЖЕНИЕ VUE ---
@@ -171,7 +171,7 @@ createApp({
             try {
                 const { data, error } = await supabaseClient.rpc('get_project_details', { p_id: projectId });
                 if (error) throw error;
-                currentProject.value = data[0];
+                currentProject.value = data;
             } catch (error) {
                 console.error("Error selecting project:", error);
                 showAlert("Не удалось загрузить данные проекта.");
@@ -331,13 +331,16 @@ createApp({
                     throw new Error("Пользователь не авторизован.");
                 }
 
-                // Вызываем нашу Edge Function
+                // 1. Получаем самые свежие и полные данные по всем проектам
+                const { data: allProjectsData, error: rpcError } = await supabaseClient.rpc('get_all_project_details_for_admin');
+                if (rpcError) throw rpcError;
+
+                // 2. Вызываем нашу Edge Function с полными данными
                 const { data, error } = await supabaseClient.functions.invoke('ai-handler', {
                     body: {
                         analysisType,
-                        // Важно: передаем .value, чтобы получить сами массивы, а не Proxy-объекты Vue
                         allUsers: allUsers.value,
-                        allProjects: allProjects.value
+                        allProjects: allProjectsData // Используем свежие и полные данные
                     },
                 });
 
