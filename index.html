@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Канбан с ролями и ИИ-аналитикой (со входом)</title>
+    <title>Канбан с ролями и ИИ-аналитикой</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -23,27 +23,31 @@
 <body class="bg-gray-100 text-gray-800">
 
     <div id="app" v-cloak>
-        <!-- === ЭКРАН ВХОДА === -->
-        <div id="login-view" v-if="!isAuthenticated" class="min-h-screen flex items-center justify-center bg-gray-200">
+        <!-- ================================================================= -->
+        <!-- LOGIN VIEW -->
+        <!-- ================================================================= -->
+        <section id="login-view" v-if="!isAuthenticated" class="min-h-screen flex items-center justify-center bg-gray-200" data-testid="login-view">
             <div class="w-full max-w-md bg-white p-8 rounded-xl shadow-lg">
                 <h2 class="text-3xl font-bold text-center text-gray-700 mb-2">Вход в систему</h2>
                 <p class="text-center text-gray-500 mb-6">Войдите, чтобы получить доступ к доскам.</p>
-                <form @submit.prevent="login">
+                <form @submit.prevent="login" data-testid="login-form">
                     <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-600 mb-1">Email</label>
-                        <input type="email" v-model="loginForm.email" class="w-full border-gray-300 rounded-lg shadow-sm" required>
+                        <label for="email" class="block text-sm font-medium text-gray-600 mb-1">Email</label>
+                        <input id="email" type="email" v-model="loginForm.email" class="w-full border-gray-300 rounded-lg shadow-sm" required data-testid="login-email">
                     </div>
                     <div class="mb-6">
-                        <label class="block text-sm font-medium text-gray-600 mb-1">Пароль</label>
-                        <input type="password" v-model="loginForm.password" class="w-full border-gray-300 rounded-lg shadow-sm" required>
+                        <label for="password" class="block text-sm font-medium text-gray-600 mb-1">Пароль</label>
+                        <input id="password" type="password" v-model="loginForm.password" class="w-full border-gray-300 rounded-lg shadow-sm" required data-testid="login-password">
                     </div>
-                    <p v-if="loginForm.error" class="text-red-500 text-sm mb-4 text-center">{{ loginForm.error }}</p>
-                    <button type="submit" class="w-full bg-blue-500 text-white py-3 rounded-lg font-semibold hover:bg-blue-600 transition">Войти</button>
+                    <p v-if="loginForm.error" class="text-red-500 text-sm mb-4 text-center" data-testid="login-error">{{ loginForm.error }}</p>
+                    <button type="submit" class="w-full bg-blue-500 text-white py-3 rounded-lg font-semibold hover:bg-blue-600 transition" data-testid="login-submit">Войти</button>
                 </form>
             </div>
-        </div>
+        </section>
 
-        <!-- === ОСНОВНОЕ ПРИЛОЖЕНИЕ === -->
+        <!-- ================================================================= -->
+        <!-- AUTHENTICATED APP VIEW -->
+        <!-- ================================================================= -->
         <div v-if="isAuthenticated">
             <header class="bg-white shadow-sm p-4 flex justify-between items-center">
                 <div class="flex items-center gap-3">
@@ -51,125 +55,124 @@
                     <h1 class="text-xl font-bold text-gray-700">ИИ-агент Канбан</h1>
                 </div>
                 <div class="flex items-center gap-4">
-                    <span class="text-sm text-gray-600">Пользователь: {{ user.email }} ({{ user.role }})</span>
-                    <button @click="logout" class="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition">Выйти</button>
+                    <span class="text-sm text-gray-600" data-testid="user-info">Пользователь: {{ user.email }} ({{ user.role }})</span>
+                    <button @click="logout" class="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition" data-testid="logout-button">Выйти</button>
                 </div>
             </header>
 
-            <!-- === ПАНЕЛЬ АДМИНИСТРАТОРА ПРОЕКТА === -->
-            <div id="admin-panel-view" v-if="user.role === 'projectAdmin'" class="p-8">
+            <!-- ================================================================= -->
+            <!-- ADMIN PANEL VIEW -->
+            <!-- ================================================================= -->
+            <section id="admin-panel-view" v-if="user.role === 'projectAdmin'" class="p-8" data-testid="admin-view">
                 <h2 class="text-3xl font-bold mb-6">Панель Администратора Проекта</h2>
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    <!-- Управление пользователями -->
+                    <!-- User Management -->
                     <div class="bg-white p-6 rounded-xl shadow-lg">
                         <h3 class="text-xl font-bold mb-4">Управление пользователями</h3>
                         <form @submit.prevent="createUser" class="flex gap-2 mb-4">
-                            <input type="email" v-model="newUser.email" placeholder="Email нового пользователя" class="flex-grow border-gray-300 rounded-lg">
-                            <input type="password" v-model="newUser.password" placeholder="Пароль" class="flex-grow border-gray-300 rounded-lg">
-                            <button type="submit" class="bg-blue-500 text-white px-4 rounded-lg hover:bg-blue-600">+</button>
+                            <input type="email" v-model="admin.newUser.email" placeholder="Email нового пользователя" class="flex-grow border-gray-300 rounded-lg" data-testid="admin-new-user-email">
+                            <input type="password" v-model="admin.newUser.password" placeholder="Пароль" class="flex-grow border-gray-300 rounded-lg" data-testid="admin-new-user-password">
+                            <button type="submit" class="bg-blue-500 text-white px-4 rounded-lg hover:bg-blue-600" data-testid="admin-create-user-button">+</button>
                         </form>
                         <ul>
-                            <li v-for="u in allUsers" :key="u.id" class="flex justify-between items-center p-2 border-b">
+                            <li v-for="u in admin.allUsers" :key="u.id" class="flex justify-between items-center p-2 border-b" data-testid="user-list-item">
                                 <span>{{ u.email }} ({{ u.role }})</span>
-                                <!-- Редактирование ролей требует защищенной функции, пока отключено -->
                             </li>
                         </ul>
                     </div>
-                    <!-- Управление досками -->
+                    <!-- Board Management -->
                     <div class="bg-white p-6 rounded-xl shadow-lg">
                         <h3 class="text-xl font-bold mb-4">Управление досками</h3>
                         <form @submit.prevent="createProject" class="flex gap-2 mb-4">
-                             <input type="text" v-model="newProject.title" placeholder="Название новой доски" class="flex-grow border-gray-300 rounded-lg">
-                             <button type="submit" class="bg-blue-500 text-white px-4 rounded-lg hover:bg-blue-600">+</button>
+                             <input type="text" v-model="newProject.title" placeholder="Название новой доски" class="flex-grow border-gray-300 rounded-lg" data-testid="admin-new-project-title">
+                             <button type="submit" class="bg-blue-500 text-white px-4 rounded-lg hover:bg-blue-600" data-testid="admin-create-project-button">+</button>
                         </form>
-                        <div v-for="p in allProjects" :key="p.id" class="mb-4 p-3 border rounded-lg">
+                        <div v-for="p in allProjects" :key="p.id" class="mb-4 p-3 border rounded-lg" data-testid="project-list-item">
                             <h4 class="font-bold">{{ p.title }}</h4>
-                            <!-- Управление участниками будет добавлено позже -->
                         </div>
                     </div>
                 </div>
-                 <!-- ИИ Аналитика -->
-                <div class="bg-white p-6 rounded-xl shadow-lg mt-8">
-                    <h3 class="text-xl font-bold mb-4 flex items-center gap-2"><i class="fas fa-lightbulb text-yellow-400"></i>ИИ-Аналитика</h3>
+                 <!-- Global AI Analytics -->
+                <section class="bg-white p-6 rounded-xl shadow-lg mt-8" data-testid="admin-ai-analytics">
+                    <h3 class="text-xl font-bold mb-4 flex items-center gap-2"><i class="fas fa-lightbulb text-yellow-400"></i>ИИ-Аналитика по всем проектам</h3>
                     <div class="flex flex-wrap gap-4 mb-4">
-                        <button @click="getAiAnalysis('productivity')" class="bg-indigo-500 text-white px-4 py-2 rounded-lg hover:bg-indigo-600">Анализ продуктивности</button>
-                        <button @click="getAiAnalysis('risks')" class="bg-indigo-500 text-white px-4 py-2 rounded-lg hover:bg-indigo-600">Анализ рисков и задержек</button>
-                        <button @click="getAiAnalysis('summary')" class="bg-indigo-500 text-white px-4 py-2 rounded-lg hover:bg-indigo-600">Общая сводка по проектам</button>
+                        <button @click="getGlobalAiAnalysis('productivity')" class="bg-indigo-500 text-white px-4 py-2 rounded-lg hover:bg-indigo-600" data-testid="ai-productivity-button">Анализ продуктивности</button>
+                        <button @click="getGlobalAiAnalysis('risks')" class="bg-indigo-500 text-white px-4 py-2 rounded-lg hover:bg-indigo-600" data-testid="ai-risks-button">Анализ рисков</button>
+                        <button @click="getGlobalAiAnalysis('summary')" class="bg-indigo-500 text-white px-4 py-2 rounded-lg hover:bg-indigo-600" data-testid="ai-summary-button">Общая сводка</button>
                     </div>
-                    <div v-if="ai.loading" class="flex items-center gap-2 text-indigo-600">
+                    <div v-if="ai.loading" class="flex items-center gap-2 text-indigo-600" data-testid="ai-loading-indicator">
                         <i class="fas fa-spinner fa-spin"></i> ИИ генерирует отчет...
                     </div>
-                    <div v-if="ai.report" class="prose max-w-none mt-4 p-4 bg-indigo-50 rounded-lg border border-indigo-200" v-html="ai.report"></div>
-                </div>
-            </div>
+                    <div v-if="ai.report" class="prose max-w-none mt-4 p-4 bg-indigo-50 rounded-lg border border-indigo-200" v-html="ai.report" data-testid="ai-report"></div>
+                </section>
+            </section>
 
-            <!-- === ДАШБОРД ПОЛЬЗОВАТЕЛЯ (СПИСОК ДОСОК) === -->
-            <div id="dashboard-view" v-if="user.role !== 'projectAdmin' && !currentProject" class="p-8">
+            <!-- ================================================================= -->
+            <!-- USER DASHBOARD VIEW -->
+            <!-- ================================================================= -->
+            <section id="dashboard-view" v-if="user.role !== 'projectAdmin' && !currentProject" class="p-8" data-testid="dashboard-view">
                  <h2 class="text-3xl font-bold mb-6">Ваши доски</h2>
-
-                 <!-- Форма создания новой доски для обычных пользователей -->
                  <div class="bg-white p-6 rounded-xl shadow-lg mb-8">
                     <h3 class="text-xl font-bold mb-4">Создать новую доску</h3>
-                    <form @submit.prevent="createProject" class="flex gap-2">
-                        <input type="text" v-model="newProject.title" placeholder="Название новой доски" class="flex-grow border-gray-300 rounded-lg shadow-sm">
-                        <button type="submit" class="bg-blue-500 text-white px-5 py-2 rounded-lg font-semibold hover:bg-blue-600 transition">+</button>
+                    <form @submit.prevent="createProject" class="flex gap-2" data-testid="create-project-form">
+                        <input type="text" v-model="newProject.title" placeholder="Название новой доски" class="flex-grow border-gray-300 rounded-lg shadow-sm" data-testid="new-project-title">
+                        <button type="submit" class="bg-blue-500 text-white px-5 py-2 rounded-lg font-semibold hover:bg-blue-600 transition" data-testid="create-project-button">+</button>
                     </form>
                 </div>
-
                  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                     <div v-for="p in userProjects" :key="p.id" @click="selectProject(p.id)" class="bg-white p-6 rounded-xl shadow-lg cursor-pointer hover:shadow-xl hover:-translate-y-1 transition-all">
+                     <div v-for="p in userProjects" :key="p.id" @click="selectProject(p.id)" class="bg-white p-6 rounded-xl shadow-lg cursor-pointer hover:shadow-xl hover:-translate-y-1 transition-all" data-testid="project-card">
                          <h3 class="text-xl font-bold text-gray-800">{{ p.title }}</h3>
                      </div>
                  </div>
-            </div>
+            </section>
             
-            <!-- === ВИД КАНБАН-ДОСКИ === -->
-            <div id="kanban-view" v-if="currentProject" class="p-4 md:p-8">
+            <!-- ================================================================= -->
+            <!-- KANBAN BOARD VIEW -->
+            <!-- ================================================================= -->
+            <div id="kanban-view" v-if="currentProject" class="p-4 md:p-8" data-testid="kanban-view">
                 <div class="flex items-center gap-4 mb-6">
-                    <button @click="goBackToDashboard" class="text-blue-500 hover:underline">&larr; Назад к доскам</button>
+                    <button @click="goBackToDashboard" class="text-blue-500 hover:underline" data-testid="back-to-dashboard-button">&larr; Назад к доскам</button>
                     <h2 class="text-3xl font-bold">{{ currentProject.title }}</h2>
                 </div>
 
-                <!-- === ИИ Аналитика по текущей доске === -->
-                <div class="bg-white p-6 rounded-xl shadow-lg mb-6">
+                <section class="bg-white p-6 rounded-xl shadow-lg mb-6" data-testid="project-ai-analytics">
                     <h3 class="text-xl font-bold mb-4 flex items-center gap-2"><i class="fas fa-lightbulb text-yellow-400"></i>Аналитика по доске</h3>
                     <div class="flex flex-wrap gap-4 mb-4">
-                        <button @click="getProjectAiAnalysis('productivity')" class="bg-indigo-500 text-white px-4 py-2 rounded-lg hover:bg-indigo-600 transition-all">Анализ продуктивности</button>
-                        <button @click="getProjectAiAnalysis('risks')" class="bg-indigo-500 text-white px-4 py-2 rounded-lg hover:bg-indigo-600 transition-all">Анализ рисков</button>
-                        <button @click="getProjectAiAnalysis('summary')" class="bg-indigo-500 text-white px-4 py-2 rounded-lg hover:bg-indigo-600 transition-all">Сводка по доске</button>
+                        <button @click="getProjectAiAnalysis('productivity')" class="bg-indigo-500 text-white px-4 py-2 rounded-lg hover:bg-indigo-600" data-testid="project-ai-productivity-button">Анализ продуктивности</button>
+                        <button @click="getProjectAiAnalysis('risks')" class="bg-indigo-500 text-white px-4 py-2 rounded-lg hover:bg-indigo-600" data-testid="project-ai-risks-button">Анализ рисков</button>
+                        <button @click="getProjectAiAnalysis('summary')" class="bg-indigo-500 text-white px-4 py-2 rounded-lg hover:bg-indigo-600" data-testid="project-ai-summary-button">Сводка по доске</button>
                     </div>
-                    <div v-if="ai.projectReportLoading" class="flex items-center gap-2 text-indigo-600">
+                    <div v-if="ai.projectReportLoading" class="flex items-center gap-2 text-indigo-600" data-testid="project-ai-loading">
                         <i class="fas fa-spinner fa-spin"></i> ИИ генерирует отчет по проекту...
                     </div>
-                    <div v-if="ai.projectReport" class="prose max-w-none mt-4 p-4 bg-indigo-50 rounded-lg border border-indigo-200" v-html="ai.projectReport"></div>
-                </div>
+                    <div v-if="ai.projectReport" class="prose max-w-none mt-4 p-4 bg-indigo-50 rounded-lg border border-indigo-200" v-html="ai.projectReport" data-testid="project-ai-report"></div>
+                </section>
 
                 <main class="flex items-start gap-6 overflow-x-auto pb-8">
-                    <!-- Колонки -->
-                    <div v-for="column in currentProject.columns" :key="column.id" class="w-80 bg-gray-200 rounded-xl shadow-md flex-shrink-0 flex flex-col">
+                    <section v-for="column in currentProject.columns" :key="column.id" class="w-80 bg-gray-200 rounded-xl shadow-md flex-shrink-0 flex flex-col" :data-testid="`kanban-column-${column.id}`">
                         <div class="flex items-center justify-between p-4 border-b border-gray-300">
                             <h3 class="font-semibold text-gray-700">{{ column.title }}</h3>
-                            <button @click="openTaskModal(column.id)" class="text-gray-500 hover:text-blue-500"><i class="fas fa-plus"></i></button>
+                            <button @click="openTaskModal(column.id)" class="text-gray-500 hover:text-blue-500" :data-testid="`add-task-to-column-${column.id}`"><i class="fas fa-plus"></i></button>
                         </div>
                         <div class="tasks-container p-3 flex-grow min-h-[100px]" 
                              @dragover.prevent="dragOver" 
                              @dragleave="dragLeave" 
-                             @drop="drop($event, column.id)">
-                            <!-- Задачи -->
+                             @drop="drop($event, column.id)"
+                             :data-testid="`column-droppable-area-${column.id}`">
                             <div v-for="task in getTasksForColumn(column.id)"
                                  :key="task.id"
                                  :class="`task bg-white p-4 rounded-lg shadow-sm mb-3 cursor-pointer priority-${task.priority}`"
                                  draggable="true"
                                  @dragstart="dragStart($event, task.id)"
-                                 @click="openTaskModal(column.id, task.id)">
+                                 @click="openTaskModal(column.id, task.id)"
+                                 :data-testid="`task-${task.id}`">
                                 <p class="font-medium mb-1">{{ task.title }}</p>
                                 <p class="text-sm text-gray-600">{{ task.description.substring(0, 50) }}</p>
                             </div>
                         </div>
-                    </div>
-                    <!-- Новая колонка -->
+                    </section>
                     <div v-if="user.role !== 'user'">
-                        <button @click="addColumn" class="bg-white/80 backdrop-blur-sm text-gray-600 px-4 py-3 rounded-lg shadow-sm hover:bg-white w-72">
+                        <button @click="addColumn" class="bg-white/80 backdrop-blur-sm text-gray-600 px-4 py-3 rounded-lg shadow-sm hover:bg-white w-72" data-testid="add-column-button">
                             <i class="fas fa-plus mr-2"></i>Добавить колонку
                         </button>
                     </div>
@@ -177,52 +180,52 @@
             </div>
         </div>
 
-        <!-- Модальное окно задачи -->
-        <div v-if="taskModal.isOpen" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-40">
+        <!-- ================================================================= -->
+        <!-- MODALS -->
+        <!-- ================================================================= -->
+        <div v-if="taskModal.isOpen" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-40" data-testid="task-modal">
             <div class="bg-white rounded-xl shadow-2xl p-8 w-full max-w-2xl">
                 <h2 class="text-2xl font-bold mb-6">{{ taskModal.isEditing ? 'Редактировать задачу' : 'Новая задача' }}</h2>
-                <form @submit.prevent="saveTask">
+                <form @submit.prevent="saveTask" data-testid="task-form">
                     <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Название</label>
-                        <input type="text" v-model="taskModal.data.title" class="w-full border-gray-300 rounded-lg" required>
+                        <label for="task-title" class="block text-sm font-medium text-gray-700 mb-1">Название</label>
+                        <input id="task-title" type="text" v-model="taskModal.data.title" class="w-full border-gray-300 rounded-lg" required data-testid="task-title-input">
                     </div>
                     <div class="mb-6">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Описание</label>
-                        <textarea v-model="taskModal.data.description" rows="4" class="w-full border-gray-300 rounded-lg"></textarea>
+                        <label for="task-description" class="block text-sm font-medium text-gray-700 mb-1">Описание</label>
+                        <textarea id="task-description" v-model="taskModal.data.description" rows="4" class="w-full border-gray-300 rounded-lg" data-testid="task-description-input"></textarea>
                     </div>
                     <div class="mb-6">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Приоритет</label>
-                        <select v-model="taskModal.data.priority" class="w-full border-gray-300 rounded-lg">
+                        <label for="task-priority" class="block text-sm font-medium text-gray-700 mb-1">Приоритет</label>
+                        <select id="task-priority" v-model="taskModal.data.priority" class="w-full border-gray-300 rounded-lg" data-testid="task-priority-select">
                             <option value="low">Низкий</option>
                             <option value="medium">Средний</option>
                             <option value="high">Высокий</option>
                         </select>
                     </div>
 
-                    <!-- === ИИ-ПОМОЩНИК В ЗАДАЧЕ === -->
-                    <div v-if="taskModal.isEditing" class="my-6 p-4 bg-gray-50 rounded-lg border">
+                    <section v-if="taskModal.isEditing" class="my-6 p-4 bg-gray-50 rounded-lg border" data-testid="task-ai-helper">
                         <h4 class="font-semibold mb-3 flex items-center gap-2"><i class="fas fa-lightbulb text-yellow-400"></i>ИИ-помощник</h4>
                         <div class="flex gap-3">
-                            <button @click.prevent="getAiTaskHelper('decompose')" type="button" class="text-sm bg-indigo-100 text-indigo-700 px-3 py-1 rounded-md hover:bg-indigo-200">Разбить на подзадачи</button>
-                            <button @click.prevent="getAiTaskHelper('distribute')" type="button" class="text-sm bg-teal-100 text-teal-700 px-3 py-1 rounded-md hover:bg-teal-200">Предложить исполнителя</button>
+                            <button @click.prevent="getAiTaskHelper('decompose')" type="button" class="text-sm bg-indigo-100 text-indigo-700 px-3 py-1 rounded-md hover:bg-indigo-200" data-testid="ai-decompose-button">Разбить на подзадачи</button>
+                            <button @click.prevent="getAiTaskHelper('distribute')" type="button" class="text-sm bg-teal-100 text-teal-700 px-3 py-1 rounded-md hover:bg-teal-200" data-testid="ai-distribute-button">Предложить исполнителя</button>
                         </div>
-                        <div v-if="ai.taskHelperLoading" class="mt-3 text-sm text-gray-500">ИИ думает...</div>
-                        <div v-if="ai.taskHelperSuggestion" class="mt-3 p-3 bg-indigo-50/50 border rounded-md text-sm" v-html="ai.taskHelperSuggestion"></div>
-                    </div>
+                        <div v-if="ai.taskHelperLoading" class="mt-3 text-sm text-gray-500" data-testid="ai-task-helper-loading">ИИ думает...</div>
+                        <div v-if="ai.taskHelperSuggestion" class="mt-3 p-3 bg-indigo-50/50 border rounded-md text-sm" v-html="ai.taskHelperSuggestion" data-testid="ai-task-helper-suggestion"></div>
+                    </section>
 
-                    <div class="flex justify-end gap-4">
-                        <button type="button" @click="closeTaskModal" class="bg-gray-200 text-gray-700 px-6 py-2 rounded-lg">Отмена</button>
-                        <button type="submit" class="bg-blue-500 text-white px-6 py-2 rounded-lg">Сохранить</button>
+                    <div class="flex justify-end gap-4 mt-8">
+                        <button type="button" @click="closeTaskModal" class="bg-gray-200 text-gray-700 px-6 py-2 rounded-lg" data-testid="task-modal-cancel">Отмена</button>
+                        <button type="submit" class="bg-blue-500 text-white px-6 py-2 rounded-lg" data-testid="task-modal-save">Сохранить</button>
                     </div>
                 </form>
             </div>
         </div>
         
-        <!-- Модальное окно для уведомлений -->
-        <div v-if="alert.isOpen" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div v-if="alert.isOpen" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" data-testid="alert-modal">
             <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm text-center">
-                <p class="text-lg mb-6">{{ alert.message }}</p>
-                <button @click="alert.isOpen = false" class="bg-blue-500 text-white px-6 py-2 rounded-lg">OK</button>
+                <p class="text-lg mb-6" data-testid="alert-message">{{ alert.message }}</p>
+                <button @click="alert.isOpen = false" class="bg-blue-500 text-white px-6 py-2 rounded-lg" data-testid="alert-ok-button">OK</button>
             </div>
         </div>
     </div>
