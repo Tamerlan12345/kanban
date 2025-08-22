@@ -60,13 +60,23 @@ createApp({
                     .select('role')
                     .eq('id', userId)
                     .single();
-                if (error) throw error;
+
+                // Gracefully handle case where a user has auth but no profile entry yet.
+                // This is a common case for new users.
+                if (error && error.code !== 'PGRST116') { // PGRST116 is "No rows found"
+                    throw error;
+                }
+
                 if (data) {
                     user.role = data.role;
+                } else {
+                    user.role = 'user'; // Default role if no profile
                 }
             } catch (error) {
                 console.error('Error fetching user profile:', error);
-                showAlert('Не удалось загрузить профиль пользователя.');
+                // Fallback for any other unexpected errors
+                user.role = 'user';
+                showAlert('Не удалось загрузить данные профиля. Вам назначена роль по умолчанию.');
             }
         }
 
@@ -201,7 +211,9 @@ createApp({
                     // Не прерываем выполнение, просто оставляем список участников пустым
                     currentProjectMembers.value = [];
                 } else {
-                    currentProjectMembers.value = membersData.map(m => m.profiles);
+                    currentProjectMembers.value = membersData
+                        .map(m => m.profiles)
+                        .filter(p => p !== null); // Отфильтровываем удаленных или некорректных пользователей
                 }
 
             } catch (error) {
@@ -370,7 +382,8 @@ createApp({
                 const payload = {
                     analysisType,
                     allProjects: [currentProject.value], // Передаем массив с одним проектом
-                    allUsers: currentProjectMembers.value // Передаем участников этого проекта
+                    allUsers: currentProjectMembers.value, // Передаем участников этого проекта
+                    context: 'singleProject' // Добавляем контекст для бэкенда
                 };
 
                 const { data, error } = await supabaseClient.functions.invoke('ai-handler', {
@@ -418,7 +431,8 @@ createApp({
                     body: {
                         analysisType,
                         allUsers: allUsers.value,
-                        allProjects: allProjectsData // Используем свежие и полные данные
+                        allProjects: allProjectsData, // Используем свежие и полные данные
+                        context: 'allProjects' // Добавляем контекст для бэкенда
                     },
                 });
 
