@@ -11,7 +11,9 @@ export function useKanban(currentProject) {
     let draggedTaskId = null;
 
     const getTasksForColumn = (columnId) => {
-        return computed(() => currentProject.value?.tasks.filter(t => t.column_id === columnId) || []).value;
+        // Return the filtered array directly. Reactivity is handled by Vue because
+        // it tracks the dependency on `currentProject.value.tasks` within the template.
+        return currentProject.value?.tasks.filter(t => t.column_id === columnId) || [];
     };
 
     const addColumn = async () => {
