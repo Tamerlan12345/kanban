@@ -47,6 +47,7 @@ createApp({
             saveTask,
             addColumn,
             getTasksForColumn,
+            handleSuggestion, // Bug fix: was missing
             dragStart,
             dragOver,
             dragLeave,
@@ -162,7 +163,7 @@ createApp({
 
             // AI
             ai,
-            getAiTaskHelper: (type) => getAiTaskHelper(type, taskModal.data), // Pass current task data
+            getAiTaskHelper, // Cleanup: No longer need a wrapper
             getProjectAiAnalysis,
 
             // UI
