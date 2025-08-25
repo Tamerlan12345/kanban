@@ -5,34 +5,38 @@ import { auth, profileService } from '../services/supabaseService.js';
 export const user = reactive({
     id: null,
     email: null,
-    // role is no longer global, it's per-project
+    role: 'user', // Default role
 });
 
 export function useAuth() {
     const isAuthenticated = ref(false);
     const loginForm = reactive({ email: '', password: '', error: '', loading: false });
 
-    const checkSession = async () => {
-        const { data: { session } } = await auth.getSession();
-        if (session) {
-            await handleAuthSuccess(session);
-        } else {
-            handleAuthSignOut();
-        }
-    };
-
     const handleAuthSuccess = async (session) => {
         isAuthenticated.value = true;
         user.id = session.user.id;
         user.email = session.user.email;
-        // No longer fetching global role
+        await fetchUserProfile(session.user.id);
     };
 
     const handleAuthSignOut = () => {
         isAuthenticated.value = false;
         user.id = null;
         user.email = null;
-        // No longer setting global role
+        user.role = 'user';
+    };
+
+    const fetchUserProfile = async (userId) => {
+        try {
+            const { data, error } = await profileService.fetchUserProfile(userId);
+            if (error && error.code !== 'PGRST116') { // PGRST116 = "No rows found"
+                throw error;
+            }
+            user.role = data ? data.role : 'user';
+        } catch (error) {
+            console.error('Error fetching user profile:', error);
+            user.role = 'user'; // Fallback to default role
+        }
     };
 
     const login = async () => {
@@ -57,7 +61,6 @@ export function useAuth() {
             handleAuthSignOut(); // Force UI update immediately
         } catch (error) {
             console.error('Logout error:', error);
-            // Optionally, notify the user here.
         }
     };
 

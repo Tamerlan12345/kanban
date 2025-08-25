@@ -2,7 +2,7 @@ import { ref, reactive } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.prod
 import { projectService } from '../services/supabaseService.js';
 import { user } from './useAuth.js'; // Import the reactive user object
 
-export function useProjects() {
+export function useProjects(showAlert) { // showAlert is kept for now to avoid another reference error until all files are reverted
     const allProjects = ref([]);
     const currentProject = ref(null);
     const currentProjectMembers = ref([]);
@@ -46,16 +46,13 @@ export function useProjects() {
             if (projectError) throw projectError;
             if (membersError) throw membersError;
 
-            // Find the current user's role for this specific project
-            const currentUserMembership = membersData.find(m => m.user_id === user.id);
-            const currentUserRole = currentUserMembership ? currentUserMembership.role : null;
+            // Reverted: No per-project role logic.
+            currentProject.value = projectData;
 
-            currentProject.value = { ...projectData, currentUserRole };
-
-            // Map members to include their roles
+            // Reverted: Member list is simpler now.
             currentProjectMembers.value = membersData
-                .map(m => ({ ...m.profiles, role: m.role })) // Combine profile with project-specific role
-                .filter(p => p.id !== null); // Filter out invalid profiles
+                .map(m => m.profiles)
+                .filter(p => p !== null);
 
         } catch (error) {
             console.error("Error selecting project:", error);
