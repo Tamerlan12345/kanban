@@ -46,10 +46,16 @@ export function useProjects() {
             if (projectError) throw projectError;
             if (membersError) throw membersError;
 
-            currentProject.value = projectData;
+            // Find the current user's role for this specific project
+            const currentUserMembership = membersData.find(m => m.user_id === user.id);
+            const currentUserRole = currentUserMembership ? currentUserMembership.role : null;
+
+            currentProject.value = { ...projectData, currentUserRole };
+
+            // Map members to include their roles
             currentProjectMembers.value = membersData
-                .map(m => m.profiles)
-                .filter(p => p !== null); // Filter out invalid profiles
+                .map(m => ({ ...m.profiles, role: m.role })) // Combine profile with project-specific role
+                .filter(p => p.id !== null); // Filter out invalid profiles
 
         } catch (error) {
             console.error("Error selecting project:", error);

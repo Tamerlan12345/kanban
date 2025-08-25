@@ -1,18 +1,17 @@
 import { reactive, computed } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.prod.js';
-import { columnService, taskService } from '../services/supabaseService.js';
+import { columnService, taskService, aiSuggestionService } from '../services/supabaseService.js';
 
 export function useKanban(currentProject) {
     const taskModal = reactive({
         isOpen: false,
         isEditing: false,
         data: {},
+        suggestions: [],
     });
 
     let draggedTaskId = null;
 
     const getTasksForColumn = (columnId) => {
-        // Return the filtered array directly. Reactivity is handled by Vue because
-        // it tracks the dependency on `currentProject.value.tasks` within the template.
         return currentProject.value?.tasks.filter(t => t.column_id === columnId) || [];
     };
 
@@ -28,16 +27,27 @@ export function useKanban(currentProject) {
                 currentProject.value.columns.push(data);
             } catch (error) {
                 console.error("Error adding column:", error);
-                // Notify user
             }
         }
     };
 
-    const openTaskModal = (columnId, taskId = null) => {
+    const openTaskModal = async (columnId, taskId = null) => {
+        taskModal.suggestions = []; // Clear old suggestions on open
         if (taskId && currentProject.value) {
             const taskData = currentProject.value.tasks.find(t => t.id === taskId);
             taskModal.data = { ...taskData };
             taskModal.isEditing = true;
+
+            // Fetch AI suggestions for this task
+            try {
+                const { data, error } = await aiSuggestionService.fetchSuggestionsForTask(taskId);
+                if (error) throw error;
+                taskModal.suggestions = data;
+            } catch (error) {
+                console.error("Error fetching suggestions:", error);
+                taskModal.suggestions = [];
+            }
+
         } else {
             taskModal.data = {
                 column_id: columnId,
@@ -54,6 +64,21 @@ export function useKanban(currentProject) {
     const closeTaskModal = () => {
         taskModal.isOpen = false;
         taskModal.data = {};
+        taskModal.suggestions = [];
+    };
+
+    const handleSuggestion = async (suggestion, newStatus) => {
+        try {
+            const { data: updatedSuggestion, error } = await aiSuggestionService.updateSuggestionStatus(suggestion.id, newStatus);
+            if (error) throw error;
+
+            const index = taskModal.suggestions.findIndex(s => s.id === suggestion.id);
+            if (index !== -1) {
+                taskModal.suggestions[index] = updatedSuggestion;
+            }
+        } catch (error) {
+            console.error(`Error updating suggestion status to ${newStatus}:`, error);
+        }
     };
 
     const saveTask = async () => {
@@ -76,7 +101,6 @@ export function useKanban(currentProject) {
             closeTaskModal();
         } catch (error) {
             console.error("Error saving task:", error);
-            // Notify user
         }
     };
 
@@ -109,7 +133,6 @@ export function useKanban(currentProject) {
                     }
                 } catch (error) {
                     console.error("Error moving task:", error);
-                    // Notify user
                 }
             }
             draggedTaskId = null;
@@ -123,6 +146,7 @@ export function useKanban(currentProject) {
         saveTask,
         addColumn,
         getTasksForColumn,
+        handleSuggestion,
         dragStart,
         dragOver,
         dragLeave,
