@@ -69,7 +69,7 @@ export function useAI(currentProject, currentProjectMembers, showAlert) {
             const aiAnalysisPromise = aiService.invoke(analysisPayload);
 
             // --- Fetch quantitative metrics ---
-            const task_ids = currentProject.value.tasks.map(t => t.id);
+            const task_ids = currentProject.value?.tasks?.map(t => t.id) || [];
             let decompositionCountPromise;
             if (task_ids.length > 0) {
                  decompositionCountPromise = aiSuggestionService.countSuggestions({
