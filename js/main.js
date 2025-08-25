@@ -3,6 +3,8 @@ import { useAuth, user as globalUser } from './composables/useAuth.js';
 import { useProjects } from './composables/useProjects.js';
 import { useKanban } from './composables/useKanban.js';
 import { useAI } from './composables/useAI.js';
+import { useMembers } from './composables/useMembers.js';
+import { usePersonalTasks } from './composables/usePersonalTasks.js';
 import { profileService } from './services/supabaseService.js';
 
 // --- A simple, app-wide notification system ---
@@ -58,41 +60,37 @@ createApp({
             getGlobalAiAnalysis,
             resetTaskHelper,
             resetProjectReport,
-        } = useAI(currentProject, currentProjectMembers);
+        } = useAI(currentProject, currentProjectMembers, showAlert);
 
-        // --- 2. Admin-specific Logic ---
-        const admin = reactive({
-            allUsers: [],
-            newUser: { email: '', password: '' },
-        });
+        const {
+            membersModal,
+            openMembersModal,
+            closeMembersModal,
+            inviteMember,
+            removeMember,
+            updateMemberRole,
+        } = useMembers(currentProject, currentProjectMembers, showAlert);
 
-        const fetchAllUsersForAdmin = async () => {
-            if (user.role === 'projectAdmin') {
-                try {
-                    const { data, error } = await profileService.fetchAllUsers();
-                    if (error) throw error;
-                    admin.allUsers = data;
-                } catch (error) {
-                    console.error("Error fetching all users for admin:", error);
-                    showAlert("Не удалось загрузить список пользователей.");
-                }
-            }
-        };
+        const {
+            personalTasks,
+            newPersonalTaskTitle,
+            fetchPersonalTasks,
+            addPersonalTask,
+            togglePersonalTask,
+            deletePersonalTask,
+        } = usePersonalTasks(showAlert);
 
-        const createAdminUser = () => {
-            showAlert('Функция создания пользователей в разработке.');
-        };
+        // Admin-specific logic is now handled by per-project roles.
+        // The old global admin panel logic is removed.
 
         // --- 3. Lifecycle and Watchers ---
         // When auth state changes, fetch initial data
         watch(isAuthenticated, (isAuth) => {
             if (isAuth) {
                 fetchProjects();
-                fetchAllUsersForAdmin();
             } else {
                 // Clear data on logout
                 allProjects.value = [];
-                admin.allUsers = [];
                 currentProject.value = null;
             }
         });
@@ -109,6 +107,11 @@ createApp({
             if (!isOpen) {
                 resetTaskHelper();
             }
+        });
+
+        // When a new task is opened in the modal, fetch its personal tasks
+        watch(() => taskModal.data?.id, (newTaskId) => {
+            fetchPersonalTasks(newTaskId);
         });
 
         // --- 4. Expose to Template ---
@@ -129,26 +132,38 @@ createApp({
 
             // Kanban View
             currentProject,
+            currentProjectMembers,
             goBackToDashboard,
             addColumn,
             getTasksForColumn,
             dragStart, dragOver, dragLeave, drop,
 
             // Task Modal
+            handleSuggestion,
             taskModal,
             openTaskModal,
             closeTaskModal,
             saveTask,
 
+            // Member Management Modal
+            membersModal,
+            openMembersModal,
+            closeMembersModal,
+            inviteMember,
+            removeMember,
+            updateMemberRole,
+
+            // Personal Tasks
+            personalTasks,
+            newPersonalTaskTitle,
+            addPersonalTask,
+            togglePersonalTask,
+            deletePersonalTask,
+
             // AI
             ai,
             getAiTaskHelper: (type) => getAiTaskHelper(type, taskModal.data), // Pass current task data
             getProjectAiAnalysis,
-            getGlobalAiAnalysis: (type) => getGlobalAiAnalysis(type, admin.allUsers), // Pass all users data
-
-            // Admin
-            admin,
-            createUser: createAdminUser,
 
             // UI
             alert,

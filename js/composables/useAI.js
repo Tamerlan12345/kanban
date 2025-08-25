@@ -1,21 +1,22 @@
 import { reactive } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.prod.js';
-import { aiService, projectService } from '../services/supabaseService.js';
+import { aiService, projectService, aiSuggestionService } from '../services/supabaseService.js';
+import { user } from './useAuth.js';
 
-export function useAI(currentProject, currentProjectMembers) {
+export function useAI(currentProject, currentProjectMembers, showAlert) {
     const ai = reactive({
         loading: false,
         report: '',
         projectReportLoading: false,
         projectReport: '',
+        projectMetrics: {}, // For quantitative metrics
         taskHelperLoading: false,
-        taskHelperSuggestion: '',
+        taskHelperSuggestion: '', // This will be deprecated
     });
 
     const formatReport = (report) => report.replace(/\n/g, '<br>').replace(/\* \s*/g, '<br>&bull; ');
 
     const getAiTaskHelper = async (helperType, task) => {
         ai.taskHelperLoading = true;
-        ai.taskHelperSuggestion = '';
         try {
             if (!currentProjectMembers.value || currentProjectMembers.value.length === 0) {
                 throw new Error("Список участников проекта пуст или не был загружен.");
@@ -27,10 +28,22 @@ export function useAI(currentProject, currentProjectMembers) {
             };
             const { data, error } = await aiService.invoke(payload);
             if (error) throw error;
-            ai.taskHelperSuggestion = formatReport(data.report);
+
+            const suggestionData = {
+                task_id: task.id,
+                suggester_id: user.id,
+                content: data.report,
+                status: 'pending',
+                type: helperType,
+            };
+            const { error: createError } = await aiSuggestionService.createSuggestion(suggestionData);
+            if (createError) throw createError;
+
+            showAlert('Предложение ИИ отправлено на рассмотрение. Оно появится в задаче после перезагрузки.');
+
         } catch (error) {
             console.error(`Error with AI task helper (${helperType}):`, error);
-            ai.taskHelperSuggestion = `<p class='text-red-500'>Ошибка: ${error.message}</p>`;
+            showAlert(`Ошибка ИИ-помощника: ${error.message}`);
         } finally {
             ai.taskHelperLoading = false;
         }
@@ -39,19 +52,49 @@ export function useAI(currentProject, currentProjectMembers) {
     const getProjectAiAnalysis = async (analysisType) => {
         ai.projectReportLoading = true;
         ai.projectReport = '';
+        ai.projectMetrics = {}; // Reset metrics
+
         try {
             if (!currentProject.value || !currentProjectMembers.value) {
                 throw new Error("Данные по текущему проекту не загружены.");
             }
-            const payload = {
+
+            // --- Fetch text-based AI analysis ---
+            const analysisPayload = {
                 analysisType,
                 allProjects: [currentProject.value],
                 allUsers: currentProjectMembers.value,
                 context: 'singleProject'
             };
-            const { data, error } = await aiService.invoke(payload);
-            if (error) throw error;
-            ai.projectReport = formatReport(data.report);
+            const aiAnalysisPromise = aiService.invoke(analysisPayload);
+
+            // --- Fetch quantitative metrics ---
+            const task_ids = currentProject.value.tasks.map(t => t.id);
+            let decompositionCountPromise;
+            if (task_ids.length > 0) {
+                 decompositionCountPromise = aiSuggestionService.countSuggestions({
+                    task_ids,
+                    status: 'approved',
+                    type: 'decompose'
+                });
+            } else {
+                // Resolve with a compatible structure if there are no tasks
+                decompositionCountPromise = Promise.resolve({ count: 0, error: null });
+            }
+
+            // --- Await all results ---
+            const [
+                { data: analysisData, error: analysisError },
+                { count: decompCount, error: countError }
+            ] = await Promise.all([aiAnalysisPromise, decompositionCountPromise]);
+
+            if (analysisError) throw analysisError;
+            if (countError) throw countError;
+
+            // --- Update state ---
+            ai.projectReport = formatReport(analysisData.report);
+            ai.projectMetrics.decomposition_count = decompCount;
+
         } catch (error) {
             console.error(`Error with AI project analysis (${analysisType}):`, error);
             ai.projectReport = `<p class='text-red-500'>Ошибка: ${error.message}</p>`;
@@ -65,11 +108,9 @@ export function useAI(currentProject, currentProjectMembers) {
         ai.loading = true;
         ai.report = '';
         try {
-            // 1. Fetch the most up-to-date and complete data for all projects
             const { data: allProjectsData, error: rpcError } = await projectService.fetchAllProjectDetailsForAdmin();
             if (rpcError) throw rpcError;
 
-            // 2. Invoke the AI handler with the complete dataset
             const payload = {
                 analysisType,
                 allUsers: allUsers,
@@ -87,7 +128,6 @@ export function useAI(currentProject, currentProjectMembers) {
         }
     };
 
-    // Resets AI state, e.g., when closing a modal or leaving a view
     const resetTaskHelper = () => {
         ai.taskHelperLoading = false;
         ai.taskHelperSuggestion = '';
@@ -96,6 +136,7 @@ export function useAI(currentProject, currentProjectMembers) {
     const resetProjectReport = () => {
         ai.projectReportLoading = false;
         ai.projectReport = '';
+        ai.projectMetrics = {};
     };
 
     return {

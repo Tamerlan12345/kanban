@@ -5,7 +5,7 @@ import { auth, profileService } from '../services/supabaseService.js';
 export const user = reactive({
     id: null,
     email: null,
-    role: 'user', // Default role
+    // role is no longer global, it's per-project
 });
 
 export function useAuth() {
@@ -25,28 +25,14 @@ export function useAuth() {
         isAuthenticated.value = true;
         user.id = session.user.id;
         user.email = session.user.email;
-        await fetchUserProfile(session.user.id);
+        // No longer fetching global role
     };
 
     const handleAuthSignOut = () => {
         isAuthenticated.value = false;
         user.id = null;
         user.email = null;
-        user.role = 'user';
-    };
-
-    const fetchUserProfile = async (userId) => {
-        try {
-            const { data, error } = await profileService.fetchUserProfile(userId);
-            if (error && error.code !== 'PGRST116') { // PGRST116 = "No rows found"
-                throw error;
-            }
-            user.role = data ? data.role : 'user';
-        } catch (error) {
-            console.error('Error fetching user profile:', error);
-            user.role = 'user'; // Fallback to default role
-            // Optionally, notify the user here.
-        }
+        // No longer setting global role
     };
 
     const login = async () => {
