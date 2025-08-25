@@ -38,7 +38,7 @@ createApp({
             createProject,
             selectProject,
             goBackToDashboard,
-        } = useProjects();
+        } = useProjects(showAlert);
 
         const {
             taskModal,

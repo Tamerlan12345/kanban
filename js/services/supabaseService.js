@@ -15,15 +15,16 @@ export const auth = {
 };
 
 // --- User Profile ---
+// Reverting to use the global role from the 'profiles' table.
 export const profileService = {
     fetchUserProfile: (userId) => supabaseClient
         .from('profiles')
-        .select('*') // Role is no longer global
+        .select('role')
         .eq('id', userId)
         .single(),
     fetchAllUsers: () => supabaseClient
         .from('profiles')
-        .select('id, email'), // Role is no longer global
+        .select('id, email, role'),
     findProfileByEmail: (email) => supabaseClient
         .from('profiles')
         .select('id')
@@ -45,7 +46,7 @@ export const projectService = {
     // Fetches the members of a specific project
     fetchProjectMembers: (projectId) => supabaseClient
         .from('project_members')
-        .select(`role, user_id, profiles (id, email)`) // Fetch role from project_members
+        .select(`user_id, profiles (id, email, role)`) // Reverted to get role from profiles
         .eq('project_id', projectId),
 
     // Creates a new project with default columns
@@ -57,10 +58,10 @@ export const projectService = {
             .single();
         if (projectError) throw projectError;
 
-        // Set the project owner as the first admin
+        // Reverted: No longer setting a role here.
         await supabaseClient
             .from('project_members')
-            .insert({ project_id: projectData.id, user_id: ownerId, role: 'admin' });
+            .insert({ project_id: projectData.id, user_id: ownerId });
 
         const defaultColumns = [
             { title: 'Сделать', order: 1, project_id: projectData.id },
@@ -72,10 +73,11 @@ export const projectService = {
         return projectData;
     },
 
-    addMember: (projectId, userId, role = 'member') => supabaseClient
+    // Reverted: addMember no longer handles roles.
+    addMember: (projectId, userId) => supabaseClient
         .from('project_members')
-        .insert({ project_id: projectId, user_id: userId, role: role })
-        .select(`*, profiles (id, email)`) // return member with profile
+        .insert({ project_id: projectId, user_id: userId })
+        .select(`*, profiles (id, email)`)
         .single(),
 
     removeMember: (projectId, userId) => supabaseClient
@@ -84,13 +86,7 @@ export const projectService = {
         .eq('project_id', projectId)
         .eq('user_id', userId),
 
-    updateMemberRole: (projectId, userId, role) => supabaseClient
-        .from('project_members')
-        .update({ role })
-        .eq('project_id', projectId)
-        .eq('user_id', userId)
-        .select()
-        .single(),
+    // Reverted: updateMemberRole function removed as it's invalid without a role column.
 };
 
 // --- Columns ---
