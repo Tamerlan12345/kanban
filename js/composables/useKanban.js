@@ -1,7 +1,7 @@
 import { reactive, computed } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.prod.js';
 import { columnService, taskService, aiSuggestionService } from '../services/supabaseService.js';
 
-export function useKanban(currentProject) {
+export function useKanban(currentProject, showAlert) {
     const taskModal = reactive({
         isOpen: false,
         isEditing: false,
@@ -27,6 +27,7 @@ export function useKanban(currentProject) {
                 currentProject.value.columns.push(data);
             } catch (error) {
                 console.error("Error adding column:", error);
+                showAlert(`Не удалось добавить колонку: ${error.message}`);
             }
         }
     };
@@ -78,6 +79,7 @@ export function useKanban(currentProject) {
             }
         } catch (error) {
             console.error(`Error updating suggestion status to ${newStatus}:`, error);
+            showAlert(`Не удалось обработать предложение: ${error.message}`);
         }
     };
 
@@ -101,6 +103,7 @@ export function useKanban(currentProject) {
             closeTaskModal();
         } catch (error) {
             console.error("Error saving task:", error);
+            showAlert(`Не удалось сохранить задачу: ${error.message}`);
         }
     };
 
@@ -133,6 +136,7 @@ export function useKanban(currentProject) {
                     }
                 } catch (error) {
                     console.error("Error moving task:", error);
+                    showAlert(`Не удалось переместить задачу: ${error.message}`);
                 }
             }
             draggedTaskId = null;

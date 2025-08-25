@@ -52,7 +52,7 @@ createApp({
             dragOver,
             dragLeave,
             drop,
-        } = useKanban(currentProject);
+        } = useKanban(currentProject, showAlert);
 
         const {
             ai,

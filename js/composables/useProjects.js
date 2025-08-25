@@ -16,7 +16,7 @@ export function useProjects() {
             allProjects.value = data;
         } catch (error) {
             console.error("Error fetching projects:", error);
-            // Notify user
+            showAlert(`Не удалось загрузить проекты: ${error.message}`);
         }
     };
 
@@ -28,7 +28,7 @@ export function useProjects() {
             newProject.title = '';
         } catch (error) {
             console.error("Error creating project:", error);
-            // Notify user
+            showAlert(`Не удалось создать проект: ${error.message}`);
         }
     };
 
@@ -61,7 +61,7 @@ export function useProjects() {
             console.error("Error selecting project:", error);
             currentProject.value = null;
             currentProjectMembers.value = [];
-            // Notify user
+            showAlert(`Не удалось загрузить проект: ${error.message}`);
         }
     };
 
