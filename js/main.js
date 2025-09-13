@@ -32,7 +32,6 @@ createApp({
         const {
             allProjects,
             currentProject,
-            currentProjectMembers,
             newProject,
             fetchProjects,
             createProject,
@@ -43,16 +42,19 @@ createApp({
         const {
             taskModal,
             openTaskModal,
+            openSubTaskModal,
             closeTaskModal,
             saveTask,
-            addColumn,
-            getTasksForColumn,
-            handleSuggestion, // Bug fix: was missing
+            addStatus,
+            getTasksForStatus,
+            handleSuggestion,
             dragStart,
             dragOver,
             dragLeave,
             drop,
         } = useKanban(currentProject, showAlert);
+
+        const currentProjectMembers = computed(() => currentProject.value?.members || []);
 
         const {
             ai,
@@ -115,8 +117,24 @@ createApp({
             fetchPersonalTasks(newTaskId);
         });
 
-        // --- 4. Expose to Template ---
+        // --- 4. Helper Functions for Template ---
+        const getIssueTypeName = (typeId) => {
+            if (!currentProject.value?.issueTypes) return '';
+            const type = currentProject.value.issueTypes.find(t => t.id === typeId);
+            return type ? type.name : '';
+        };
+
+        const subtasksForCurrentTask = computed(() => {
+            if (!taskModal.isEditing || !taskModal.data.id || !currentProject.value?.tasks) {
+                return [];
+            }
+            return currentProject.value.tasks.filter(t => t.parent_id === taskModal.data.id);
+        });
+
+        // --- 5. Expose to Template ---
         return {
+            getIssueTypeName,
+            subtasksForCurrentTask,
             // Auth
             isAuthenticated,
             user, // Use the reactive user object
@@ -133,16 +151,17 @@ createApp({
 
             // Kanban View
             currentProject,
-            currentProjectMembers,
+            currentProjectMembers, // Now a computed property
             goBackToDashboard,
-            addColumn,
-            getTasksForColumn,
+            addStatus,
+            getTasksForStatus,
             dragStart, dragOver, dragLeave, drop,
 
             // Task Modal
             handleSuggestion,
             taskModal,
             openTaskModal,
+            openSubTaskModal,
             closeTaskModal,
             saveTask,
 
