@@ -49,28 +49,39 @@ export const projectService = {
         .select(`user_id, profiles (id, email, role)`) // Reverted to get role from profiles
         .eq('project_id', projectId),
 
-    // Creates a new project with default columns
+    // Creates a new project with a default workflow and statuses
     createProject: async (title, ownerId) => {
-        const { data: projectData, error: projectError } = await supabaseClient
+        // 1. Create the project
+        const { data: project, error: projectError } = await supabaseClient
             .from('projects')
             .insert({ title, owner_id: ownerId })
             .select()
             .single();
         if (projectError) throw projectError;
 
-        // Reverted: No longer setting a role here.
+        // 2. Add owner as a member
         await supabaseClient
             .from('project_members')
-            .insert({ project_id: projectData.id, user_id: ownerId });
+            .insert({ project_id: project.id, user_id: ownerId });
 
-        const defaultColumns = [
-            { title: 'Сделать', order: 1, project_id: projectData.id },
-            { title: 'В процессе', order: 2, project_id: projectData.id },
-            { title: 'Готово', order: 3, project_id: projectData.id },
+        // 3. Create a default workflow for the project
+        const { data: workflow, error: workflowError } = await supabaseClient
+            .from('workflows')
+            .insert({ name: 'Основной рабочий процесс', project_id: project.id })
+            .select()
+            .single();
+        if (workflowError) throw workflowError;
+
+        // 4. Create default statuses for the workflow
+        const defaultStatuses = [
+            { name: 'Сделать', order: 1, workflow_id: workflow.id },
+            { name: 'В процессе', order: 2, workflow_id: workflow.id },
+            { name: 'Готово', order: 3, workflow_id: workflow.id },
         ];
-        await supabaseClient.from('columns').insert(defaultColumns);
+        const { error: statusesError } = await supabaseClient.from('statuses').insert(defaultStatuses);
+        if (statusesError) throw statusesError;
 
-        return projectData;
+        return project;
     },
 
     // Reverted: addMember no longer handles roles.
@@ -89,22 +100,83 @@ export const projectService = {
     // Reverted: updateMemberRole function removed as it's invalid without a role column.
 };
 
-// --- Columns ---
-export const columnService = {
-    createColumn: (title, projectId, order) => supabaseClient
-        .from('columns')
-        .insert({ title, project_id: projectId, order })
+// --- Workflows, Statuses (New) ---
+
+export const workflowService = {
+    // Fetches the workflow and its statuses for a project
+    fetchWorkflowForProject: async (projectId) => {
+        const { data, error } = await supabaseClient
+            .from('workflows')
+            .select(`
+                *,
+                statuses (*)
+            `)
+            .eq('project_id', projectId)
+            .single();
+        if (error) throw error;
+        // Sort statuses by their order
+        if (data && data.statuses) {
+            data.statuses.sort((a, b) => a.order - b.order);
+        }
+        return { data, error };
+    }
+};
+
+export const statusService = {
+    createStatus: (statusData) => supabaseClient
+        .from('statuses')
+        .insert(statusData)
         .select()
         .single(),
 };
 
-// --- Tasks ---
-export const taskService = {
-    createTask: (taskData) => supabaseClient
-        .from('tasks')
-        .insert(taskData)
+
+// --- Issue Types (New) ---
+export const issueTypeService = {
+    fetchForProject: (projectId) => supabaseClient
+        .from('issue_types')
+        .select('*')
+        .eq('project_id', projectId)
+        .order('name'),
+
+    create: (issueTypeData) => supabaseClient
+        .from('issue_types')
+        .insert(issueTypeData)
         .select()
         .single(),
+
+    update: (issueTypeId, updates) => supabaseClient
+        .from('issue_types')
+        .update(updates)
+        .eq('id', issueTypeId)
+        .select()
+        .single(),
+
+    delete: (issueTypeId) => supabaseClient
+        .from('issue_types')
+        .delete()
+        .eq('id', issueTypeId),
+};
+
+// --- Tasks ---
+export const taskService = {
+    fetchTasksForProject: (projectId) => supabaseClient
+        .from('tasks')
+        .select('*')
+        .eq('project_id', projectId),
+
+    createTask: (taskData) => {
+        // Ensure tasks are created with `status_id`, not `column_id`
+        const { column_id, ...rest } = taskData;
+        if (column_id) { // In case old data is passed, convert it
+            rest.status_id = column_id;
+        }
+        return supabaseClient
+            .from('tasks')
+            .insert(rest)
+            .select()
+            .single();
+    },
 
     updateTask: (taskId, updates) => supabaseClient
         .from('tasks')
@@ -113,9 +185,9 @@ export const taskService = {
         .select()
         .single(),
 
-    moveTask: (taskId, newColumnId) => supabaseClient
+    moveTask: (taskId, newStatusId) => supabaseClient
         .from('tasks')
-        .update({ column_id: newColumnId })
+        .update({ status_id: newStatusId }) // Changed from column_id to status_id
         .eq('id', taskId),
 };
 

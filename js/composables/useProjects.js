@@ -1,11 +1,11 @@
 import { ref, reactive } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.prod.js';
-import { projectService } from '../services/supabaseService.js';
+import { projectService, workflowService, taskService, issueTypeService } from '../services/supabaseService.js';
 import { user } from './useAuth.js'; // Import the reactive user object
 
-export function useProjects(showAlert) { // showAlert is kept for now to avoid another reference error until all files are reverted
+export function useProjects(showAlert) {
     const allProjects = ref([]);
     const currentProject = ref(null);
-    const currentProjectMembers = ref([]);
+    // currentProjectMembers is now derived from currentProject.value.members
     const newProject = reactive({ title: '' });
 
     const fetchProjects = async () => {
@@ -34,43 +34,50 @@ export function useProjects(showAlert) { // showAlert is kept for now to avoid a
 
     const selectProject = async (projectId) => {
         try {
-            // Fetch project details and members in parallel
+            const projectData = allProjects.value.find(p => p.id === projectId);
+            if (!projectData) throw new Error("Проект не найден");
+
+            // Fetch members, workflow, tasks, and issue types in parallel
             const [
-                { data: projectData, error: projectError },
-                { data: membersData, error: membersError }
+                { data: membersData, error: membersError },
+                { data: workflowData, error: workflowError },
+                { data: tasksData, error: tasksError },
+                { data: issueTypesData, error: issueTypesError }
             ] = await Promise.all([
-                projectService.fetchProjectDetails(projectId),
-                projectService.fetchProjectMembers(projectId)
+                projectService.fetchProjectMembers(projectId),
+                workflowService.fetchWorkflowForProject(projectId),
+                taskService.fetchTasksForProject(projectId),
+                issueTypeService.fetchForProject(projectId)
             ]);
 
-            if (projectError) throw projectError;
             if (membersError) throw membersError;
+            if (workflowError) throw workflowError;
+            if (tasksError) throw tasksError;
+            if (issueTypesError) throw issueTypesError;
 
-            // Reverted: No per-project role logic.
-            currentProject.value = projectData;
-
-            // Reverted: Member list is simpler now.
-            currentProjectMembers.value = membersData
-                .map(m => m.profiles)
-                .filter(p => p !== null);
+            // Combine all data into the currentProject object
+            currentProject.value = {
+                ...projectData,
+                members: membersData.map(m => m.profiles).filter(p => p !== null),
+                workflow: workflowData,
+                tasks: tasksData || [],
+                issueTypes: issueTypesData || []
+            };
 
         } catch (error) {
             console.error("Error selecting project:", error);
             currentProject.value = null;
-            currentProjectMembers.value = [];
             showAlert(`Не удалось загрузить проект: ${error.message}`);
         }
     };
 
     const goBackToDashboard = () => {
         currentProject.value = null;
-        currentProjectMembers.value = [];
     };
 
     return {
         allProjects,
         currentProject,
-        currentProjectMembers,
         newProject,
         fetchProjects,
         createProject,

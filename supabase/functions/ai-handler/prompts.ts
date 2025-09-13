@@ -20,29 +20,36 @@ function formatDataForPrompt(allUsers, allProjects) {
     dataString += "\n**Проекты и Задачи:**\n";
     allProjects.forEach(p => {
         dataString += `\n---\n**Проект: "${p.title}"**\n`;
+        const statuses = p.workflow?.statuses;
+
+        if (!statuses || statuses.length === 0) {
+            dataString += "- *В этом проекте не настроены статусы рабочего процесса.*\n";
+            return;
+        }
         if (!p.tasks || p.tasks.length === 0) {
             dataString += "- *Задач нет*\n";
-        } else {
-            const tasksByColumn = {};
-            p.columns.forEach(c => tasksByColumn[c.id] = []);
-            p.tasks.forEach(t => {
-                if(tasksByColumn[t.column_id]) {
-                    tasksByColumn[t.column_id].push(t);
-                }
-            });
-
-            p.columns.forEach(c => {
-                dataString += `\n*Колонка: ${c.title}*\n`;
-                const tasks = tasksByColumn[c.id];
-                if (tasks.length === 0) {
-                    dataString += "- *Пусто*\n";
-                } else {
-                    tasks.forEach(t => {
-                        dataString += `  - **Задача:** ${t.title} (Приоритет: ${t.priority})\n`;
-                    });
-                }
-            });
+            return;
         }
+
+        const tasksByStatus = {};
+        statuses.forEach(s => tasksByStatus[s.id] = []);
+        p.tasks.forEach(t => {
+            if(tasksByStatus[t.status_id]) {
+                tasksByStatus[t.status_id].push(t);
+            }
+        });
+
+        statuses.forEach(s => {
+            dataString += `\n*Статус: ${s.name}*\n`;
+            const tasks = tasksByStatus[s.id];
+            if (tasks.length === 0) {
+                dataString += "- *Пусто*\n";
+            } else {
+                tasks.forEach(t => {
+                    dataString += `  - **Задача:** ${t.title} (Приоритет: ${t.priority}, ID: ${t.id})\n`;
+                });
+            }
+        });
     });
     return dataString;
 }

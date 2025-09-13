@@ -1,0 +1,5 @@
+# Supabase config
+js/config.js
+
+# macOS files
+.DS_Store

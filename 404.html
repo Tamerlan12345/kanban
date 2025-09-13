@@ -84,7 +84,7 @@
                      </div>
                  </div>
             </section>
-            
+
             <!-- ================================================================= -->
             <!-- KANBAN BOARD VIEW -->
             <!-- ================================================================= -->
@@ -119,37 +119,31 @@
                 </section>
 
                 <main class="flex items-start gap-6 overflow-x-auto pb-8">
-                    <!-- Refactored to loop through statuses from the workflow -->
-                    <section v-for="status in currentProject.workflow?.statuses" :key="status.id" class="w-80 bg-gray-200 rounded-xl shadow-md flex-shrink-0 flex flex-col" :data-testid="`kanban-status-${status.id}`">
+                    <section v-for="column in currentProject.columns" :key="column.id" class="w-80 bg-gray-200 rounded-xl shadow-md flex-shrink-0 flex flex-col" :data-testid="`kanban-column-${column.id}`">
                         <div class="flex items-center justify-between p-4 border-b border-gray-300">
-                            <h3 class="font-semibold text-gray-700">{{ status.name }}</h3>
-                            <button @click="openTaskModal(status.id)" class="text-gray-500 hover:text-blue-500" :data-testid="`add-task-to-status-${status.id}`"><i class="fas fa-plus"></i></button>
+                            <h3 class="font-semibold text-gray-700">{{ column.title }}</h3>
+                            <button @click="openTaskModal(column.id)" class="text-gray-500 hover:text-blue-500" :data-testid="`add-task-to-column-${column.id}`"><i class="fas fa-plus"></i></button>
                         </div>
-                        <div class="tasks-container p-3 flex-grow min-h-[100px]" 
-                             @dragover.prevent="dragOver" 
-                             @dragleave="dragLeave" 
-                             @drop="drop($event, status.id)"
-                             :data-testid="`status-droppable-area-${status.id}`">
-                            <div v-for="task in getTasksForStatus(status.id)"
+                        <div class="tasks-container p-3 flex-grow min-h-[100px]"
+                             @dragover.prevent="dragOver"
+                             @dragleave="dragLeave"
+                             @drop="drop($event, column.id)"
+                             :data-testid="`column-droppable-area-${column.id}`">
+                            <div v-for="task in getTasksForColumn(column.id)"
                                  :key="task.id"
                                  :class="`task bg-white p-4 rounded-lg shadow-sm mb-3 cursor-pointer priority-${task.priority}`"
                                  draggable="true"
                                  @dragstart="dragStart($event, task.id)"
-                                 @click="openTaskModal(status.id, task.id)"
+                                 @click="openTaskModal(column.id, task.id)"
                                  :data-testid="`task-${task.id}`">
-                                <div class="flex justify-between items-start mb-2">
-                                    <p class="font-medium flex-grow pr-2">{{ task.title }}</p>
-                                    <span v-if="task.issue_type_id" class="text-xs font-semibold bg-gray-300 text-gray-700 px-2 py-0.5 rounded-full flex-shrink-0">
-                                        {{ getIssueTypeName(task.issue_type_id) }}
-                                    </span>
-                                </div>
+                                <p class="font-medium mb-1">{{ task.title }}</p>
                                 <p class="text-sm text-gray-600">{{ task.description.substring(0, 50) }}</p>
                             </div>
                         </div>
                     </section>
                     <div v-if="user.role === 'projectAdmin'">
-                        <button @click="addStatus" class="bg-white/80 backdrop-blur-sm text-gray-600 px-4 py-3 rounded-lg shadow-sm hover:bg-white w-72" data-testid="add-status-button">
-                            <i class="fas fa-plus mr-2"></i>Добавить статус
+                        <button @click="addColumn" class="bg-white/80 backdrop-blur-sm text-gray-600 px-4 py-3 rounded-lg shadow-sm hover:bg-white w-72" data-testid="add-column-button">
+                            <i class="fas fa-plus mr-2"></i>Добавить колонку
                         </button>
                     </div>
                 </main>
@@ -171,24 +165,13 @@
                         <label for="task-description" class="block text-sm font-medium text-gray-700 mb-1">Описание</label>
                         <textarea id="task-description" v-model="taskModal.data.description" rows="4" class="w-full border-gray-300 rounded-lg" data-testid="task-description-input"></textarea>
                     </div>
-                    <div class="grid grid-cols-2 gap-6 mb-6">
-                        <div>
-                            <label for="task-priority" class="block text-sm font-medium text-gray-700 mb-1">Приоритет</label>
-                            <select id="task-priority" v-model="taskModal.data.priority" class="w-full border-gray-300 rounded-lg" data-testid="task-priority-select">
-                                <option value="low">Низкий</option>
-                                <option value="medium">Средний</option>
-                                <option value="high">Высокий</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label for="task-type" class="block text-sm font-medium text-gray-700 mb-1">Тип задачи</label>
-                            <select id="task-type" v-model="taskModal.data.issue_type_id" class="w-full border-gray-300 rounded-lg" data-testid="task-type-select" :disabled="!currentProject.issueTypes || currentProject.issueTypes.length === 0">
-                                <option v-if="currentProject.issueTypes?.length === 0" :value="null">Типы не настроены</option>
-                                <option v-for="type in currentProject.issueTypes" :key="type.id" :value="type.id">
-                                    {{ type.name }}
-                                </option>
-                            </select>
-                        </div>
+                    <div class="mb-6">
+                        <label for="task-priority" class="block text-sm font-medium text-gray-700 mb-1">Приоритет</label>
+                        <select id="task-priority" v-model="taskModal.data.priority" class="w-full border-gray-300 rounded-lg" data-testid="task-priority-select">
+                            <option value="low">Низкий</option>
+                            <option value="medium">Средний</option>
+                            <option value="high">Высокий</option>
+                        </select>
                     </div>
 
                     <section v-if="taskModal.isEditing" class="my-6 p-4 bg-gray-50 rounded-lg border" data-testid="task-ai-helper">
@@ -224,24 +207,6 @@
                         </div>
                     </section>
 
-                    <!-- Sub-tasks Section -->
-                    <section v-if="taskModal.isEditing" class="my-6">
-                        <h4 class="font-semibold mb-3 flex items-center gap-2"><i class="fas fa-sitemap text-blue-500"></i>Подзадачи</h4>
-                        <ul v-if="subtasksForCurrentTask.length > 0" class="space-y-2 mb-3">
-                            <li v-for="subtask in subtasksForCurrentTask" :key="subtask.id" class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                <span class="font-medium">{{ subtask.title }}</span>
-                                <!-- TODO: Add button to open/edit subtask -->
-                                <span class="text-xs font-semibold bg-gray-300 text-gray-700 px-2 py-0.5 rounded-full">
-                                    {{ getIssueTypeName(subtask.issue_type_id) }}
-                                </span>
-                            </li>
-                        </ul>
-                        <p v-else class="text-sm text-gray-500 mb-3">Нет подзадач.</p>
-                        <button @click.prevent="openSubTaskModal(taskModal.data.id)" type="button" class="text-sm bg-blue-100 text-blue-700 px-3 py-1 rounded-md hover:bg-blue-200" data-testid="add-subtask-button">
-                            + Добавить подзадачу
-                        </button>
-                    </section>
-
                     <section class="my-6">
                         <h4 class="font-semibold mb-3 flex items-center gap-2"><i class="fas fa-user-check text-blue-500"></i>Персональный чек-лист</h4>
 
@@ -271,7 +236,7 @@
                 </form>
             </div>
         </div>
-        
+
         <div v-if="alert.isOpen" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" data-testid="alert-modal">
             <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm text-center">
                 <p class="text-lg mb-6" data-testid="alert-message">{{ alert.message }}</p>
