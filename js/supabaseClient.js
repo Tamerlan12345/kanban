@@ -1,8 +1,10 @@
-const { createClient } = supabase;
+// supabaseClient.js
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
 
-const SUPABASE_URL = 'https://tlldtaepbhvrpcmfmfnk.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRsbGR0YWVwYmh2cnBjbWZtZm5rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU3NzA2NTIsImV4cCI6MjA3MTM0NjY1Mn0.gf-OpsJugJXOk2NnZfJ4v6gpxFiadpf0yHC9_PEdC6M';
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    console.error("Supabase URL or Anon Key is missing. Make sure you have a `js/config.js` file with SUPABASE_URL and SUPABASE_ANON_KEY constants.");
+}
 
-const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 export default supabaseClient;
