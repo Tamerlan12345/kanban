@@ -2,7 +2,7 @@ import supabaseClient from '../supabaseClient.js';
 
 /**
  * =================================================================
- * Service for all interactions with the Supabase backend.
+ * Service for all interactions with the Supabase backend (Quantum Version)
  * =================================================================
  */
 
@@ -15,11 +15,10 @@ export const auth = {
 };
 
 // --- User Profile ---
-// Reverting to use the global role from the 'profiles' table.
 export const profileService = {
     fetchUserProfile: (userId) => supabaseClient
         .from('profiles')
-        .select('role')
+        .select('id, email, role') // Expanded to get more profile data
         .eq('id', userId)
         .single(),
     fetchAllUsers: () => supabaseClient
@@ -32,39 +31,71 @@ export const profileService = {
         .single(),
 };
 
-// --- Projects & Kanban Data ---
+// --- Workspaces ---
+export const workspaceService = {
+    create: (name, ownerId) => supabaseClient
+        .from('workspaces')
+        .insert({ name, owner_id: ownerId })
+        .select()
+        .single(),
+    // TODO: This needs a proper RLS policy or RPC function to get all workspaces for a user.
+    // For now, fetching all workspaces, assuming RLS will handle security.
+    fetchAll: () => supabaseClient
+        .from('workspaces')
+        .select('*'),
+};
+
+// --- Teams ---
+export const teamService = {
+    create: (name, workspaceId) => supabaseClient
+        .from('teams')
+        .insert({ name, workspace_id: workspaceId })
+        .select()
+        .single(),
+    addMember: (teamId, userId) => supabaseClient
+        .from('team_members')
+        .insert({ team_id: teamId, user_id: userId }),
+    removeMember: (teamId, userId) => supabaseClient
+        .from('team_members')
+        .delete()
+        .eq('team_id', teamId)
+        .eq('user_id', userId),
+    fetchForWorkspace: (workspaceId) => supabaseClient
+        .from('teams')
+        .select('*, team_members(*, profiles(id, email))')
+        .eq('workspace_id', workspaceId),
+};
+
+// --- Projects ---
 export const projectService = {
-    // Fetches projects for the currently logged-in user
-    fetchUserProjects: (userId) => supabaseClient.rpc('get_projects_for_user', { user_id: userId }),
+    // Fetches projects for a given workspace
+    fetchForWorkspace: (workspaceId) => supabaseClient
+        .from('projects')
+        .select('*')
+        .eq('workspace_id', workspaceId),
 
-    // Fetches all project details for the admin view
-    fetchAllProjectDetailsForAdmin: () => supabaseClient.rpc('get_all_project_details_for_admin'),
+    // Fetches the detailed view of a single project, including statuses and tasks
+    fetchProjectDetails: (projectId) => supabaseClient
+        .from('projects')
+        .select(`
+            *,
+            workflows (*, statuses (*)),
+            tasks (*)
+        `)
+        .eq('id', projectId)
+        .single(),
 
-    // Fetches the detailed view of a single project, including columns and tasks
-    fetchProjectDetails: (projectId) => supabaseClient.rpc('get_project_details', { p_id: projectId }),
-
-    // Fetches the members of a specific project
-    fetchProjectMembers: (projectId) => supabaseClient
-        .from('project_members')
-        .select(`user_id, profiles (id, email, role)`) // Reverted to get role from profiles
-        .eq('project_id', projectId),
-
-    // Creates a new project with a default workflow and statuses
-    createProject: async (title, ownerId) => {
+    // Creates a new project within a workspace
+    createProject: async (title, ownerId, workspaceId, teamId = null) => {
         // 1. Create the project
         const { data: project, error: projectError } = await supabaseClient
             .from('projects')
-            .insert({ title, owner_id: ownerId })
+            .insert({ title, owner_id: ownerId, workspace_id: workspaceId, team_id: teamId })
             .select()
             .single();
         if (projectError) throw projectError;
 
-        // 2. Add owner as a member
-        await supabaseClient
-            .from('project_members')
-            .insert({ project_id: project.id, user_id: ownerId });
-
-        // 3. Create a default workflow for the project
+        // 2. Create a default workflow for the project
         const { data: workflow, error: workflowError } = await supabaseClient
             .from('workflows')
             .insert({ name: 'Основной рабочий процесс', project_id: project.id })
@@ -72,7 +103,7 @@ export const projectService = {
             .single();
         if (workflowError) throw workflowError;
 
-        // 4. Create default statuses for the workflow
+        // 3. Create default statuses for the workflow
         const defaultStatuses = [
             { name: 'Сделать', order: 1, workflow_id: workflow.id },
             { name: 'В процессе', order: 2, workflow_id: workflow.id },
@@ -83,38 +114,17 @@ export const projectService = {
 
         return project;
     },
-
-    // Reverted: addMember no longer handles roles.
-    addMember: (projectId, userId) => supabaseClient
-        .from('project_members')
-        .insert({ project_id: projectId, user_id: userId })
-        .select(`*, profiles (id, email)`)
-        .single(),
-
-    removeMember: (projectId, userId) => supabaseClient
-        .from('project_members')
-        .delete()
-        .eq('project_id', projectId)
-        .eq('user_id', userId),
-
-    // Reverted: updateMemberRole function removed as it's invalid without a role column.
 };
 
-// --- Workflows, Statuses (New) ---
-
+// --- Workflows & Statuses ---
 export const workflowService = {
-    // Fetches the workflow and its statuses for a project
     fetchWorkflowForProject: async (projectId) => {
         const { data, error } = await supabaseClient
             .from('workflows')
-            .select(`
-                *,
-                statuses (*)
-            `)
+            .select(`*, statuses (*)`)
             .eq('project_id', projectId)
             .single();
         if (error) throw error;
-        // Sort statuses by their order
         if (data && data.statuses) {
             data.statuses.sort((a, b) => a.order - b.order);
         }
@@ -130,53 +140,26 @@ export const statusService = {
         .single(),
 };
 
-
-// --- Issue Types (New) ---
+// --- Issue Types ---
 export const issueTypeService = {
-    fetchForProject: (projectId) => supabaseClient
-        .from('issue_types')
-        .select('*')
-        .eq('project_id', projectId)
-        .order('name'),
-
-    create: (issueTypeData) => supabaseClient
-        .from('issue_types')
-        .insert(issueTypeData)
-        .select()
-        .single(),
-
-    update: (issueTypeId, updates) => supabaseClient
-        .from('issue_types')
-        .update(updates)
-        .eq('id', issueTypeId)
-        .select()
-        .single(),
-
-    delete: (issueTypeId) => supabaseClient
-        .from('issue_types')
-        .delete()
-        .eq('id', issueTypeId),
+    fetchForProject: (projectId) => supabaseClient.from('issue_types').select('*').eq('project_id', projectId).order('name'),
+    create: (issueTypeData) => supabaseClient.from('issue_types').insert(issueTypeData).select().single(),
+    update: (issueTypeId, updates) => supabaseClient.from('issue_types').update(updates).eq('id', issueTypeId).select().single(),
+    delete: (issueTypeId) => supabaseClient.from('issue_types').delete().eq('id', issueTypeId),
 };
 
-// --- Tasks ---
+// --- Tasks & Dependencies ---
 export const taskService = {
     fetchTasksForProject: (projectId) => supabaseClient
         .from('tasks')
-        .select('*')
+        .select('*, task_dependencies!task_id(*)') // Fetch dependencies
         .eq('project_id', projectId),
 
-    createTask: (taskData) => {
-        // Ensure tasks are created with `status_id`, not `column_id`
-        const { column_id, ...rest } = taskData;
-        if (column_id) { // In case old data is passed, convert it
-            rest.status_id = column_id;
-        }
-        return supabaseClient
-            .from('tasks')
-            .insert(rest)
-            .select()
-            .single();
-    },
+    createTask: (taskData) => supabaseClient
+        .from('tasks')
+        .insert(taskData)
+        .select()
+        .single(),
 
     updateTask: (taskId, updates) => supabaseClient
         .from('tasks')
@@ -187,71 +170,38 @@ export const taskService = {
 
     moveTask: (taskId, newStatusId) => supabaseClient
         .from('tasks')
-        .update({ status_id: newStatusId }) // Changed from column_id to status_id
+        .update({ status_id: newStatusId })
         .eq('id', taskId),
+
+    addDependency: (taskId, dependsOnTaskId, type) => supabaseClient
+        .from('task_dependencies')
+        .insert({ task_id: taskId, depends_on_task_id: dependsOnTaskId, type: type }),
+
+    removeDependency: (taskId, dependsOnTaskId) => supabaseClient
+        .from('task_dependencies')
+        .delete()
+        .eq('task_id', taskId)
+        .eq('depends_on_task_id', dependsOnTaskId),
 };
 
 // --- Personal Tasks ---
 export const personalTaskService = {
-    fetchForProjectTask: (projectTaskId) => supabaseClient
-        .from('personal_tasks')
-        .select('*')
-        .eq('linked_project_task_id', projectTaskId)
-        .order('created_at'),
-
-    create: (taskData) => supabaseClient
-        .from('personal_tasks')
-        .insert(taskData)
-        .select()
-        .single(),
-
-    update: (taskId, updates) => supabaseClient
-        .from('personal_tasks')
-        .update(updates)
-        .eq('id', taskId)
-        .select()
-        .single(),
-
-    delete: (taskId) => supabaseClient
-        .from('personal_tasks')
-        .delete()
-        .eq('id', taskId),
+    fetchForProjectTask: (projectTaskId) => supabaseClient.from('personal_tasks').select('*').eq('linked_project_task_id', projectTaskId).order('created_at'),
+    create: (taskData) => supabaseClient.from('personal_tasks').insert(taskData).select().single(),
+    update: (taskId, updates) => supabaseClient.from('personal_tasks').update(updates).eq('id', taskId).select().single(),
+    delete: (taskId) => supabaseClient.from('personal_tasks').delete().eq('id', taskId),
 };
 
-// --- AI Suggestions (for approval flow) ---
+// --- AI Suggestions ---
 export const aiSuggestionService = {
-    createSuggestion: (suggestionData) => supabaseClient
-        .from('ai_suggestions')
-        .insert(suggestionData)
-        .select()
-        .single(),
-
-    updateSuggestionStatus: (suggestionId, status) => supabaseClient
-        .from('ai_suggestions')
-        .update({ status })
-        .eq('id', suggestionId)
-        .select()
-        .single(),
-
-    fetchSuggestionsForTask: (taskId) => supabaseClient
-        .from('ai_suggestions')
-        .select('*')
-        .eq('task_id', taskId),
-
+    createSuggestion: (suggestionData) => supabaseClient.from('ai_suggestions').insert(suggestionData).select().single(),
+    updateSuggestionStatus: (suggestionId, status) => supabaseClient.from('ai_suggestions').update({ status }).eq('id', suggestionId).select().single(),
+    fetchSuggestionsForTask: (taskId) => supabaseClient.from('ai_suggestions').select('*').eq('task_id', taskId),
     countSuggestions: ({ task_ids, status, type }) => {
-        let query = supabaseClient
-            .from('ai_suggestions')
-            .select('id', { count: 'exact', head: true });
-
-        if (task_ids) {
-            query = query.in('task_id', task_ids);
-        }
-        if (status) {
-            query = query.eq('status', status);
-        }
-        if (type) {
-            query = query.eq('type', type);
-        }
+        let query = supabaseClient.from('ai_suggestions').select('id', { count: 'exact', head: true });
+        if (task_ids) query = query.in('task_id', task_ids);
+        if (status) query = query.eq('status', status);
+        if (type) query = query.eq('type', type);
         return query;
     },
 };

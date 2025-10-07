@@ -69,8 +69,31 @@
             <!-- ================================================================= -->
             <!-- USER DASHBOARD VIEW -->
             <!-- ================================================================= -->
-            <section id="dashboard-view" v-if="user.role !== 'projectAdmin' && !currentProject" class="p-8" data-testid="dashboard-view">
-                 <h2 class="text-3xl font-bold mb-6">Ваши доски</h2>
+            <!-- Empty State: No workspaces yet -->
+            <section id="empty-state-view" v-if="!currentProject && allWorkspaces.length === 0" class="p-8 text-center" data-testid="empty-state-view">
+                <div class="max-w-lg mx-auto bg-white p-10 rounded-xl shadow-lg">
+                    <h2 class="text-3xl font-bold mb-4">Добро пожаловать!</h2>
+                    <p class="text-gray-600 mb-6">Похоже, у вас еще нет рабочего пространства. Давайте создадим ваше первое.</p>
+                    <form @submit.prevent="createWorkspace" class="flex gap-2" data-testid="create-workspace-form">
+                        <input type="text" v-model="newWorkspace.name" placeholder="Название вашего пространства" class="flex-grow border-gray-300 rounded-lg shadow-sm" required>
+                        <button type="submit" class="bg-blue-500 text-white px-5 py-2 rounded-lg font-semibold hover:bg-blue-600 transition">Создать</button>
+                    </form>
+                </div>
+            </section>
+
+            <!-- Dashboard View: Workspaces exist -->
+            <section id="dashboard-view" v-if="!currentProject && allWorkspaces.length > 0" class="p-8" data-testid="dashboard-view">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-3xl font-bold">Ваши доски</h2>
+                    <div>
+                        <label for="workspace-selector" class="text-sm font-medium text-gray-600 mr-2">Рабочее пространство:</label>
+                        <select id="workspace-selector" @change="selectWorkspace($event.target.value)" :value="currentWorkspace?.id" class="border-gray-300 rounded-lg shadow-sm">
+                            <option v-for="ws in allWorkspaces" :key="ws.id" :value="ws.id">
+                                {{ ws.name }}
+                            </option>
+                        </select>
+                    </div>
+                </div>
                  <div class="bg-white p-6 rounded-xl shadow-lg mb-8">
                     <h3 class="text-xl font-bold mb-4">Создать новую доску</h3>
                     <form @submit.prevent="createProject" class="flex gap-2" data-testid="create-project-form">
