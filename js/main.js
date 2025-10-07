@@ -30,11 +30,16 @@ createApp({
         } = useAuth();
 
         const {
+            allWorkspaces,
+            currentWorkspace,
             allProjects,
             currentProject,
             newProject,
-            fetchProjects,
+            newWorkspace, // For creating new workspaces
+            initialize, // New initialization function
+            selectWorkspace,
             createProject,
+            createWorkspace, // For creating new workspaces
             selectProject,
             goBackToDashboard,
         } = useProjects(showAlert);
@@ -90,9 +95,11 @@ createApp({
         // When auth state changes, fetch initial data
         watch(isAuthenticated, (isAuth) => {
             if (isAuth) {
-                fetchProjects();
+                initialize(); // Use the new initialization function
             } else {
                 // Clear data on logout
+                allWorkspaces.value = [];
+                currentWorkspace.value = null;
                 allProjects.value = [];
                 currentProject.value = null;
             }
@@ -141,6 +148,13 @@ createApp({
             loginForm,
             login,
             logout,
+
+            // Workspaces
+            allWorkspaces,
+            currentWorkspace,
+            selectWorkspace,
+            newWorkspace,
+            createWorkspace,
 
             // Projects & Dashboard
             userProjects: allProjects, // Renaming for template clarity
