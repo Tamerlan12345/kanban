@@ -25,6 +25,9 @@ FROM python:3.11-slim
 # Set the working directory for the backend
 WORKDIR /code
 
+# Install system dependencies required for audio processing
+RUN apt-get update && apt-get install -y ffmpeg
+
 # Copy requirements.txt and install Python dependencies
 COPY backend/requirements.txt /code/
 RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
