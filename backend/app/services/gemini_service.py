@@ -1,17 +1,18 @@
 import google.generativeai as genai
-from ..main import gemini_model # Import the globally initialized model
+from ..config import settings
+
+# Configure the Gemini API key
+genai.configure(api_key=settings.GEMINI_API_KEY)
 
 # System prompt as defined in the technical specification
 SYSTEM_PROMPT = "Ты — эксперт по корпоративному обучению. Твоя задача — отвечать на вопросы пользователя кратко, четко и по делу, используя модель STAR (Situation, Task, Action, Result), где это применимо. Будь вежливым и профессиональным."
 
 async def stream_audio_to_gemini(audio_chunks):
     """
-    Uses the globally initialized Gemini model to stream audio chunks and
-    yield back the text responses.
+    Initializes a Gemini session and streams audio chunks to it,
+    yielding back the text responses.
     """
-    # The model is now initialized on application startup in main.py.
-    # We can directly use the imported `gemini_model` instance.
-    model = gemini_model
+    model = genai.GenerativeModel('models/gemini-1.5-flash')
 
     # This is a placeholder for the live, streaming API interaction.
     # The actual google-generativeai library might have a different implementation
