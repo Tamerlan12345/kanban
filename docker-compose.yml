@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/app:/code/app
+    # Pass the .env file to the container for environment variables
+    env_file:
+      - ./backend/.env
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  frontend:
+    # We use a node image to run the React development server.
+    image: node:18
+    working_dir: /app
+    volumes:
+      # Mount the entire frontend directory
+      - ./frontend:/app
+    ports:
+      # Default Vite port
+      - "5173:5173"
+    # Install dependencies and run the development server
+    command: >
+      sh -c "npm install && npm run dev -- --host"
+    depends_on:
+      - backend
