@@ -56,7 +56,7 @@ async def stream_audio_to_gemini(audio_data: bytes):
         # 2. Generate content with Gemini using inline audio data
         logger.info("Initializing Gemini Generative Model (gemini-1.5-flash).")
         model = genai.GenerativeModel(
-            model_name='models/gemini-1.5-flash',
+            model_name='gemini-1.5-flash',
             system_instruction=SYSTEM_PROMPT
         )
 
