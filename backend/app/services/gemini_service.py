@@ -1,5 +1,10 @@
 import google.generativeai as genai
 from ..config import settings
+from pydub import AudioSegment
+import io
+import asyncio
+import os
+import uuid
 
 # Configure the Gemini API key
 genai.configure(api_key=settings.GEMINI_API_KEY)
@@ -7,33 +12,65 @@ genai.configure(api_key=settings.GEMINI_API_KEY)
 # System prompt as defined in the technical specification
 SYSTEM_PROMPT = "Ты — эксперт по корпоративному обучению. Твоя задача — отвечать на вопросы пользователя кратко, четко и по делу, используя модель STAR (Situation, Task, Action, Result), где это применимо. Будь вежливым и профессиональным."
 
-async def stream_audio_to_gemini(audio_chunks):
+async def stream_audio_to_gemini(audio_data: bytes):
     """
-    Initializes a Gemini session and streams audio chunks to it,
-    yielding back the text responses.
+    Receives a complete audio byte stream, converts it, sends it to Gemini,
+    and streams the text response back.
     """
-    model = genai.GenerativeModel('models/gemini-1.5-flash')
+    print("Starting audio processing for Gemini.")
 
-    # This is a placeholder for the live, streaming API interaction.
-    # The actual google-generativeai library might have a different implementation
-    # for live audio streaming (e.g., a specific method or class).
-    # For this MVP, we simulate the streaming behavior.
+    # 1. Convert audio from WEBM/Opus to a compatible format like MP3
+    # Use a temporary file path for conversion
+    temp_webm_path = f"/tmp/{uuid.uuid4()}.webm"
+    temp_mp3_path = f"/tmp/{uuid.uuid4()}.mp3"
 
-    # Let's assume the real API would look something like this:
-    # session = model.start_live_session(system_instruction=SYSTEM_PROMPT)
-    # for chunk in audio_chunks:
-    #     response = session.send_audio_chunk(chunk)
-    #     if response.text:
-    #         yield response.text
+    try:
+        # Write the received bytes to a temporary webm file
+        with open(temp_webm_path, "wb") as f:
+            f.write(audio_data)
+        print(f"Temporarily saved audio to {temp_webm_path}")
 
-    # Since we don't have a live API to connect to, we'll simulate a response.
-    # This function will be updated once the actual Gemini Live API client is available.
+        # Convert the audio file to MP3 using pydub
+        audio = AudioSegment.from_file(temp_webm_path, format="webm")
+        audio.export(temp_mp3_path, format="mp3")
+        print(f"Converted audio to {temp_mp3_path}")
 
-    print("Simulating Gemini API call...")
-    full_response = "Это симуляция ответа от Gemini. Когда вы говорите, аудиопоток отправляется сюда, и я генерирую ответ в реальном времени. Например, если вы спросите про модель STAR, я расскажу, что это Situation, Task, Action, Result."
+        # 2. Upload the converted audio file to the Gemini API
+        print("Uploading audio file to Gemini...")
+        audio_file = genai.upload_file(path=temp_mp3_path, mime_type="audio/mp3")
+        print(f"Successfully uploaded file: {audio_file.name}")
 
-    import asyncio
+        # 3. Initialize the generative model and generate content
+        print("Generating content with Gemini...")
+        model = genai.GenerativeModel(
+            model_name='models/gemini-1.5-flash',
+            system_instruction=SYSTEM_PROMPT
+        )
 
-    for char in full_response:
-        yield char
-        await asyncio.sleep(0.05) # Simulate streaming delay
+        # The prompt for the model includes the uploaded audio file
+        prompt = ["Пожалуйста, проанализируй этот аудиофайл и ответь на мой вопрос.", audio_file]
+
+        # Generate content with streaming enabled
+        response = model.generate_content(prompt, stream=True)
+        print("Received streaming response from Gemini.")
+
+        # 4. Stream the response back to the client
+        for chunk in response:
+            if chunk.text:
+                # Add a small delay to simulate natural speech flow if desired
+                # await asyncio.sleep(0.05)
+                yield chunk.text
+
+    except Exception as e:
+        print(f"An error occurred in the Gemini service: {e}")
+        # Re-raise the exception to be caught by the WebSocket endpoint
+        raise
+
+    finally:
+        # Clean up temporary files
+        if os.path.exists(temp_webm_path):
+            os.remove(temp_webm_path)
+            print(f"Cleaned up temporary file: {temp_webm_path}")
+        if os.path.exists(temp_mp3_path):
+            os.remove(temp_mp3_path)
+            print(f"Cleaned up temporary file: {temp_mp3_path}")
