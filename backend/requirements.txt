@@ -3,3 +3,4 @@ uvicorn[standard]
 websockets
 google-generativeai
 pydantic-settings
+pydub
