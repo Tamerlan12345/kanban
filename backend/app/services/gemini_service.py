@@ -25,8 +25,6 @@ except (ValueError, Exception) as e:
 # System prompt as defined in the technical specification
 SYSTEM_PROMPT = "Ты — эксперт по корпоративному обучению. Твоя задача — отвечать на вопросы пользователя кратко, четко и по делу, используя модель STAR (Situation, Task, Action, Result), где это применимо. Будь вежливым и профессиональным."
 
-from google.generativeai import types
-
 async def stream_audio_to_gemini(audio_data: bytes):
     """
     Receives a complete audio byte stream, converts it, sends it to Gemini,
@@ -65,7 +63,7 @@ async def stream_audio_to_gemini(audio_data: bytes):
         # The prompt for the model now includes the audio data as an inline part
         prompt_parts = [
             "Пожалуйста, проанализируй этот аудиофайл и ответь на мой вопрос.",
-            types.Part.from_bytes(data=mp3_audio_data, mime_type="audio/mp3")
+            {"inline_data": {"data": mp3_audio_data, "mime_type": "audio/mp3"}}
         ]
         logger.info("Sending prompt to Gemini for content generation (streaming).")
 
