@@ -53,9 +53,15 @@ async def websocket_endpoint(websocket: WebSocket):
             # await websocket.send_text(f"Error: {e}")
         finally:
             print("Finished streaming text to client.")
-            # Ensure the connection is closed if not already
-            if websocket.client_state.CONNECTED:
+            # Ensure the connection is closed if not already.
+            # A try-except block is used because the client might have already
+            # closed the connection, leading to a RuntimeError.
+            try:
                 await websocket.close()
+                print("WebSocket connection closed by server.")
+            except RuntimeError as e:
+                # This error is expected if the client disconnects first.
+                print(f"Ignoring error on websocket close: {e}")
 
     # Run receiver and sender tasks concurrently
     receive_task = asyncio.create_task(receive_audio_from_client())
