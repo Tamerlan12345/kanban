@@ -26,11 +26,19 @@ async def stream_audio_to_gemini(audio_chunks):
     #     if response.text:
     #         yield response.text
 
+    # In this simulation, we first need to consume all the audio chunks
+    # to simulate waiting for the user to finish speaking.
+    print("Receiving audio stream from client...")
+    async for _ in audio_chunks:
+        # In a real implementation, we would accumulate or process these chunks.
+        # For now, we just consume them to ensure we wait for the stream to end.
+        pass
+    print("Audio stream received. Now generating simulated response.")
+
+
     # Since we don't have a live API to connect to, we'll simulate a response.
     # This function will be updated once the actual Gemini Live API client is available.
-
-    print("Simulating Gemini API call...")
-    full_response = "Это симуляция ответа от Gemini. Когда вы говорите, аудиопоток отправляется сюда, и я генерирую ответ в реальном времени. Например, если вы спросите про модель STAR, я расскажу, что это Situation, Task, Action, Result."
+    full_response = "Это симуляция ответа от Gemini. Аудиопоток получен, и теперь я генерирую этот ответ. Если бы вы спросили про модель STAR, я бы рассказал, что это Situation, Task, Action, Result."
 
     import asyncio
 
