@@ -9,6 +9,11 @@ app = FastAPI(title="Live Corporate Trainer API")
 # Mount the WebSocket router
 app.include_router(websocket.router)
 
+@app.get("/health", tags=["Health Check"])
+async def health_check():
+    """Endpoint to check if the application is running."""
+    return {"status": "OK"}
+
 # Path to the static files directory
 static_files_dir = os.path.join(os.path.dirname(__file__), "static")
 

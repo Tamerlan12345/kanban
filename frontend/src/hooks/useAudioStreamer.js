@@ -1,7 +1,5 @@
 import { useState, useRef } from 'react';
 
-const WEBSOCKET_URL = 'ws://localhost:8000/ws'; // Assuming backend runs on port 8000
-
 export const useAudioStreamer = (onResponse, onStatusUpdate, onError) => {
     const [isRecording, setIsRecording] = useState(false);
     const mediaRecorderRef = useRef(null);
@@ -15,7 +13,14 @@ export const useAudioStreamer = (onResponse, onStatusUpdate, onError) => {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
             onStatusUpdate('Подключение к серверу...');
-            const ws = new WebSocket(WEBSOCKET_URL);
+
+            // Dynamically generate the WebSocket URL based on the current page's location
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const host = window.location.host;
+            const wsURL = `${protocol}//${host}/ws`;
+
+            console.log(`Connecting to WebSocket at: ${wsURL}`);
+            const ws = new WebSocket(wsURL);
             websocketRef.current = ws;
 
             ws.onopen = () => {
