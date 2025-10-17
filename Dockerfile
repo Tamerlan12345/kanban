@@ -35,8 +35,10 @@ COPY backend/ /code/
 # Copy the built frontend static files from the builder stage
 COPY --from=builder /app/backend/app/static /code/app/static
 
-# Expose the port the app runs on
+# Expose a default port. Cloud providers like Railpack will override this.
 EXPOSE 8000
 
-# Command to run the application
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Command to run the application.
+# It uses the PORT environment variable if provided by the platform,
+# otherwise, it defaults to 8000.
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "${PORT:-8000}"]
