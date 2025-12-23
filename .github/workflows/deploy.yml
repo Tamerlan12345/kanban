@@ -1,0 +1,31 @@
+name: Deploy to Railway
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Link Supabase Project
+        run: supabase link --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} --password ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+      - name: Run Supabase migrations
+        run: |
+          supabase db push
+
+      - name: Deploy Edge Functions
+        run: |
+          supabase functions deploy gemini-ai --no-verify-jwt
+
+      - name: Deploy to Railway (if applicable)
+        uses: railway-app/railway-deploy@v1
+        with:
+          railway-token: ${{ secrets.RAILWAY_TOKEN }}
